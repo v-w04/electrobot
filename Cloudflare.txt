@@ -1,0 +1,4058 @@
+// ============================================================
+// ELECTRONICS MÉXICO - BOT TELEGRAM
+// Cloudflare Worker v6
+// Sheets: Inventario · Venta Diaria · Checador
+// ============================================================
+
+const TELEGRAM_TOKEN = '8645895839:AAGl2tLL182G9OhNTsVGztnXD0irJsIZo5A';
+const TELEGRAM_API   = 'https://api.telegram.org/bot' + TELEGRAM_TOKEN;
+const MAX_RES        = 20;
+
+// ── Sheet IDs ───────────────────────────────────────────────
+const ID = {
+  INVENTARIO:   '1coeldxAIuVGETgwr_tDzdwSY4Lkg8kopksVyDE7qdx8',
+  VENTA_DIARIA: '17S65PqXK1DfJeHloJ4IFt-3K-MnQKOQaN_BiE9RUYaw',
+  SOBREVENTA:   '1SXb0vC149vJkXU-ZYyTAV97j1tL8Q732j5W6JPH_3II',
+  POR_RECIBIR:  '17lobMQXzal-6tlYMsl8hm_CCbjoDEJ9Y78yYp-Zkt90',
+  CHECADOR:     '1V6C5N4JGw8KYWqU0dYxIXdFNRpcivTulO2DCOn8zjCQ',
+  PRECIOS:      '1hwSnp-l3HqGqwpc9SxAH69i-D4UUPUla1ujmNPx0Scg',
+  TRASLADOS:    '1F_uMoQDWZO_K4F_ZxSujQ3qI-i9aYfWwZGbZz0ntPiw',
+  VENTI:        '1-EKHvBVErOLblLv6KcRT4TP1vTAjH0DmsMF6-U17PkU',
+  KILLERS:      '18smLxoixD6WuyjP4Kr5vf0z0z17OzSzNmSZIbDF6iJQ',
+  GYM:          '1V6C5N4JGw8KYWqU0dYxIXdFNRpcivTulO2DCOn8zjCQ'
+};
+
+// ── Links directos a cada Sheet ─────────────────────────────
+const SHEET_URL = {
+  INVENTARIO:   'https://docs.google.com/spreadsheets/d/1coeldxAIuVGETgwr_tDzdwSY4Lkg8kopksVyDE7qdx8/edit',
+  VENTA_DIARIA: 'https://docs.google.com/spreadsheets/d/17S65PqXK1DfJeHloJ4IFt-3K-MnQKOQaN_BiE9RUYaw/edit',
+  SOBREVENTA:   'https://docs.google.com/spreadsheets/d/1SXb0vC149vJkXU-ZYyTAV97j1tL8Q732j5W6JPH_3II/edit',
+  POR_RECIBIR:  'https://docs.google.com/spreadsheets/d/17lobMQXzal-6tlYMsl8hm_CCbjoDEJ9Y78yYp-Zkt90/edit',
+  CHECADOR:     'https://docs.google.com/spreadsheets/d/1V6C5N4JGw8KYWqU0dYxIXdFNRpcivTulO2DCOn8zjCQ/edit',
+  PRECIOS:      'https://docs.google.com/spreadsheets/d/1hwSnp-l3HqGqwpc9SxAH69i-D4UUPUla1ujmNPx0Scg/edit',
+  TRASLADOS:    'https://docs.google.com/spreadsheets/d/1F_uMoQDWZO_K4F_ZxSujQ3qI-i9aYfWwZGbZz0ntPiw/edit',
+  VENTI:        'https://docs.google.com/spreadsheets/d/1-EKHvBVErOLblLv6KcRT4TP1vTAjH0DmsMF6-U17PkU/edit',
+  KILLERS:      'https://docs.google.com/spreadsheets/d/18smLxoixD6WuyjP4Kr5vf0z0z17OzSzNmSZIbDF6iJQ/edit'
+};
+
+// ── Configuración Odoo (XML-RPC) ─────────────────────────────
+const ODOO = {
+  URL:     'https://electronicsmexico.odoo.com',
+  DB:      'electronicsmexico',
+  USER:    'electronics.mexico.oficial@gmail.com',
+  API_KEY: 'c28fdf83a24327ab1d1cf19d62bba77672dd7408',
+  // Plantilla del link al picking: /odoo/inventory/{WAREHOUSE}/action-{ACTION}/{ID}
+  WAREHOUSE: 3,
+  ACTION:    537
+};
+
+// ── Columnas precios — índices exactos del archivo ───────────
+// Fila 1=canal, Fila 2=CLASICA/PREMIUM, datos desde fila 3
+// C=índice Clásica, P=índice Premium (null si no aplica)
+const PRECIOS_CANALES = {
+  CONCENTRADO: [
+    { label:'MELI',        C:3,  P:4    },
+    { label:'WALMART',     C:5,  P:6    },
+    { label:'TIENDA NUBE', C:7,  P:null },
+    { label:'COPPEL',      C:8,  P:null },
+    { label:'T1 SEARS',    C:9,  P:null },
+    { label:'LIVERPOOL',   C:10, P:null },
+    { label:'ELEKTRA',     C:11, P:null },
+    { label:'ALIEXPRESS',  C:12, P:null },
+    { label:'TOTALPLAY',   C:13, P:null },
+    { label:'TIKTOK SHOP', C:14, P:null },
+    { label:'INVENTARIO',  C:16, P:null }
+  ],
+  MINIMO: [
+    { label:'ML',          C:2,  P:3    },
+    { label:'WALMART',     C:4,  P:5    },
+    { label:'TIENDANUBE',  C:6,  P:null },
+    { label:'COPPEL',      C:7,  P:null },
+    { label:'SANBORNS',    C:8,  P:null },
+    { label:'SEARS',       C:9,  P:null },
+    { label:'LIV',         C:10, P:null },
+    { label:'ELEKTRA',     C:11, P:null },
+    { label:'ALIEXPRESS',  C:12, P:null },
+    { label:'TOTALPLAY',   C:13, P:null },
+    { label:'TIKTOK SHOP', C:14, P:null }
+  ],
+  MAXIMO: [
+    { label:'MELI',        C:2,  P:3    },
+    { label:'WALMART',     C:4,  P:5    },
+    { label:'COPPEL',      C:6,  P:null },
+    { label:'T1 SEARS',    C:7,  P:null },
+    { label:'LIVERPOOL',   C:8,  P:null },
+    { label:'ELEKTRA',     C:9,  P:null },
+    { label:'ALIEXPRESS',  C:10, P:null },
+    { label:'TOTALPLAY',   C:11, P:null }
+  ]
+};
+
+// ── Sheet Ventiapp Concentrado ───────────────────────────────
+const ID_VENTI = '1-EKHvBVErOLblLv6KcRT4TP1vTAjH0DmsMF6-U17PkU';
+
+// Mapa de marketplaces → índices de columna en CONCENTRADO
+// Estructura: fila1=grupo, fila2=subheader, datos desde fila3
+// Cada marketplace: STOCK, PRECIO, ID_PUB, STATUS
+const VENTI_MP = {
+  'mercadolibre': { label:'MercadoLibre',   stock:1,  precio:2,  status:4  },
+  'ml':           { label:'MercadoLibre',   stock:1,  precio:2,  status:4  },
+  'walmart':      { label:'Walmart EDI',    stock:5,  precio:6,  status:8  },
+  'walmartedi':   { label:'Walmart EDI',    stock:5,  precio:6,  status:8  },
+  'tiendanube':   { label:'Tiendanube',     stock:9,  precio:10, status:12 },
+  'coppel':       { label:'Coppel',         stock:13, precio:14, status:16 },
+  'elektra':      { label:'ElektraV2',      stock:17, precio:18, status:20 },
+  'elektrav2':    { label:'ElektraV2',      stock:17, precio:18, status:20 },
+  'totalplay':    { label:'TotalPlay Shop', stock:21, precio:22, status:24 },
+  't1claro':      { label:'T1 Claro',       stock:25, precio:26, status:28 },
+  't1':           { label:'T1 Claro',       stock:25, precio:26, status:28 },
+  'liverpool':    { label:'Liverpool',      stock:29, precio:30, status:32 },
+  'tiktok':       { label:'TikTok Shop',    stock:33, precio:34, status:36 },
+  'totales':      { label:'TOTALES',        stock:37, precio:null, status:null, canales:38 },
+  'odoo':         { label:'ODOO',           stock:39, precio:null, status:40 }
+};
+
+const VENTI_ALL_MP = ['mercadolibre','walmart','tiendanube','coppel','elektra','totalplay','t1claro','liverpool','tiktok'];
+
+// Stock sin canal: headers en fila 2, datos desde fila 3
+const VENTI_SC = { SKU:0, STOCK_ODOO:1, CANALES_ACT:2,
+  ML:3, WMT:4, TN:5, COP:6, ELK:7, TP:8, T1:9, LIV:10, TT:11, PCT:12 };
+const VENTI_SC_LABELS = ['MercadoLibre','Walmart EDI','Tiendanube','Coppel','ElektraV2','TotalPlay Shop','T1 Claro','Liverpool','TikTok Shop'];
+
+// Más stock Venti que Odoo: headers en fila 1 (grupos) y fila 2 (subheaders), datos desde fila 3
+const VENTI_MS = { SKU:0, STOCK_ODOO:1 };
+// Por marketplace: [STOCK_CANAL, EXCESO] en pares desde col 2
+const VENTI_MS_MP = [
+  { label:'MercadoLibre',   canal:2,  exceso:3  },
+  { label:'Walmart EDI',    canal:4,  exceso:5  },
+  { label:'Tiendanube',     canal:6,  exceso:7  },
+  { label:'Coppel',         canal:8,  exceso:9  },
+  { label:'ElektraV2',      canal:10, exceso:11 },
+  { label:'TotalPlay Shop', canal:12, exceso:13 },
+  { label:'T1 Claro',       canal:14, exceso:15 },
+  { label:'Liverpool',      canal:16, exceso:17 },
+  { label:'TikTok Shop',    canal:18, exceso:19 }
+];
+const ID_TRASLADOS = '1F_uMoQDWZO_K4F_ZxSujQ3qI-i9aYfWwZGbZz0ntPiw';
+
+// ── Sheet Chatbot (respuestas genéricas) ─────────────────────
+const ID_CHATBOT = '1M-vQ725PcujTlBpnCcSqf2KwLshRt58dufF_xMNyK6E';
+const CHATBOT_HOJA = 'Hoja 1';
+
+// Cache en memoria del chatbot (se recarga cada hora)
+let chatbotCache = null;
+let chatbotCacheTs = 0;
+const CHATBOT_TTL = 60 * 60 * 1000; // 1 hora
+
+// Columnas — fila 1=grupos, fila 2=subheaders, datos desde fila 3
+const TRAS = {
+  SO:           0,
+  GUIA_GLOBAL:  1,
+  SKU:          2,   // NUEVO
+  PIEZAS:       3,   // NUEVO
+  PICK_REF:     4,   PICK_DESDE:   5,  PICK_HASTA:   6,
+  PICK_CONT:    7,   PICK_FPROG:   8,  PICK_FCREAT:  9,
+  PICK_FHECHO:  10,  PICK_EST:     11, PICK_GUIA:    12,
+  PICK_WAVE:    13,  PICK_DOC:     14,
+  PACK_REF:     15,  PACK_DESDE:   16, PACK_HASTA:   17,
+  PACK_CONT:    18,  PACK_FPROG:   19, PACK_FCREAT:  20,
+  PACK_FHECHO:  21,  PACK_EST:     22, PACK_GUIA:    23,
+  PACK_WAVE:    24,  PACK_DOC:     25,
+  OUT_REF:      26,  OUT_DESDE:    27, OUT_HASTA:    28,
+  OUT_CONT:     29,  OUT_FPROG:    30, OUT_FCREAT:   31,
+  OUT_FHECHO:   32,  OUT_EST:      33, OUT_GUIA:     34,
+  OUT_WAVE:     35,  OUT_DOC:      36
+};
+const INV = { REF:0, CAT:1, MARCA:2, NOMBRE:3, MODELO:4, COLOR:5, DISP:9, SKU:10, BODEGA:11 };
+
+// ── Columnas hojas de canal de venta ────────────────────────
+const CANAL = { ID_LINEA:0, SO:1, FECHA:2, CLIENTE:3, VENDEDOR:4,
+                ESTADO:5, SKU:6, PRODUCTO:7, CANTIDAD:8,
+                PRECIO:9, IMPORTE:10, TOTAL:11, PRECIO_REF:12 };
+
+// ── Columnas Histórico de alertas (precios erróneos) ─────────
+// Fecha[0], SO[1], Cliente[2], Vendedor[3], SKU[4],
+// Cantidad[5], Venta[6], Erik[7], Diferencia[8]
+const ALERTA = { FECHA:0, SO:1, CLIENTE:2, VENDEDOR:3, SKU:4,
+                 CANTIDAD:5, VENTA:6, ERIK:7, DIFERENCIA:8 };
+
+// ── Columnas Histórico Vendedor Incorrecto ───────────────────
+// Fecha[0], SO[1], Cliente[2], Vendedor[3], SKU[4],
+// Producto[5], Cantidad[6], Precio[7], Importe[8], Total[9]
+const VEND_INC = { FECHA:0, SO:1, CLIENTE:2, VENDEDOR:3, SKU:4,
+                   PRODUCTO:5, CANTIDAD:6, PRECIO:7, IMPORTE:8, TOTAL:9 };
+
+// ── Columnas Sobreventa ──────────────────────────────────────
+const SOBRE = { REF:0, CONTACTO:3, FECHA:4, DOC:5, ESTADO:6,
+                SKU:8, NOMBRE:9, QTY_DEM:10, QTY_REAL:11 };
+
+// ── Columnas Por Recibir ─────────────────────────────────────
+const RECIBIR = { REF:0, PROVEEDOR:1, DOC:2, FECHA:3,
+                  ESTADO:5, SKU:9, NOMBRE:10, QTY_ESP:11, QTY_REC:12 };
+
+// ── Columnas Checador ────────────────────────────────────────
+// ALERTAS: Tipo[0], ID[1], Nombre[2], Mes[3], Cantidad[4], Mensaje[5], Severidad[6]
+const CH_ALERTA = { TIPO:0, ID:1, NOMBRE:2, MES:3, CANTIDAD:4, MENSAJE:5, SEVERIDAD:6 };
+
+// METRICAS_DIARIAS: ID[0], Nombre[1], Fecha[2], Turno[3], Checadas[4],
+// Entrada[5], Clas.Entrada[6], Estatus[7], Min.Retardo[8],
+// ...Salida[21], Horas[23], HorasExtra[24], EsRetardo[25],
+// EsFalta[26], EsVacaciones[27], EsEnfermedad[28], EsDiaInhabil[29], Obs[30]
+const CH_MET = { ID:0, NOMBRE:1, FECHA:2, TURNO:3, CHECADAS:4,
+                 ENTRADA:5, ESTATUS:7, MIN_RETARDO:8,
+                 SALIDA:21, HORAS:23, HORAS_EXTRA:24,
+                 ES_RETARDO:25, ES_FALTA:26, ES_VAC:27, ES_ENF:28, OBS:30 };
+
+// RESUMEN_MENSUAL: ID[0], Nombre[1], Mes[2], DiasT[3], Puntuales[4],
+// Tolerancia[5], Retardos[6], Faltas[7], Vacaciones[8],
+// Enfermedad[9], TotalHoras[10], ExcesosComida[11], PctPuntualidad[12]
+const CH_RES = { ID:0, NOMBRE:1, MES:2, DIAS_T:3, PUNTUALES:4,
+                 TOLERANCIA:5, RETARDOS:6, FALTAS:7, VACACIONES:8,
+                 ENFERMEDAD:9, HORAS:10, EXCESOS:11, PCT:12 };
+
+// EVENTUALIDADES: cols 0-3 = Vacaciones, cols 5-10 = Enfermedades
+const CH_VAC = { ID:0, NOMBRE:1, INICIO:2, FIN:3 };
+const CH_ENF = { ID:5, NOMBRE:6, FECHA:7, TIPO:8, SALIO:9, HORA:10 };
+
+// TURNOS_DEFAULT: Admin[0], Empleado[1], Turno[2], Horario[3],
+// Depto[4], Cumple[5], FechaContrat[6], Bono[7],
+// DiasVacTotal[8], DiasUsados[9], DiasRestantes[10], Años[12], Dias[13]
+const CH_TURNO = { ID:0, NOMBRE:1, TURNO:2, HORARIO:3, DEPTO:4,
+                   CUMPLE:5, CONTRAT:6, BONO:7,
+                   VAC_TOTAL:8, VAC_USADOS:9, VAC_REST:10,
+                   ANIOS:12, DIAS_ANT:13 };
+
+// Hojas de canal donde buscar por SO (excluye históricas)
+const HOJAS_CANAL = [
+  'ML ELECTRONICS','ML LEONGEM','ML VIP ELECTRONICS','ML ELECTRONICS MEXICO',
+  'SEARS','ML','SANBORNS','LIV','TiendaNube','WALMART','SIN CLIENTE',
+  'COPPEL','Totalplay','TIKTOK SHOP','ELEKTRA','PRECIOS ERIK'
+];
+
+// ── Canales de venta ─────────────────────────────────────────
+const CANALES = {
+  'walmart':        'WALMART',
+  'sears':          'SEARS',
+  'liverpool':      'LIV',
+  'liv':            'LIV',
+  'sanborns':       'SANBORNS',
+  'tiktok':         'TIKTOK SHOP',
+  'tiktok shop':    'TIKTOK SHOP',
+  'coppel':         'COPPEL',
+  'ml electronics': 'ML ELECTRONICS',
+  'ml leongem':     'ML LEONGEM',
+  'ml vip':         'ML VIP ELECTRONICS',
+  'ml':             'ML ELECTRONICS',
+  'mercado libre':  'ML ELECTRONICS',
+  'tiendanube':     'TiendaNube',
+  'elektra':        'ELEKTRA',
+  'totalplay':      'Totalplay',
+  'sin cliente':    'SIN CLIENTE'
+};
+
+// ── PIN desactivado por el momento ─────────────────────────
+
+// ── Memoria de conversación por usuario ─────────────────────
+// Guarda los últimos mensajes por chatId con TTL de 10 minutos
+const conversaciones = {};
+const CONV_TTL     = 10 * 60 * 1000; // 10 minutos
+const CONV_MAX_MSG = 6;               // máximo 6 mensajes (3 intercambios)
+
+// ── Cloudflare AI (incluido en Workers, sin API key externa) ─
+const CF_AI_MODEL = '@cf/meta/llama-3.1-8b-instruct';
+const WHATSAPP = [];
+const USUARIOS = {};
+
+// ============================================================
+// ENTRY POINT
+// ============================================================
+
+
+// Normaliza porcentajes: si el valor viene como decimal (0.76) lo convierte a 76
+// Si ya viene como porcentaje (76) lo deja igual. Aplica a valores de Google Sheets.
+function normPct(val) {
+  const n = parseFloat(String(val||'0').replace(/[^0-9.-]/g, '')) || 0;
+  return n <= 1 ? n * 100 : n;
+}
+
+export default {
+  async fetch(request, env, ctx) {
+    const url = new URL(request.url);
+
+    // ── CORS preflight para la app web ──
+    if (request.method === 'OPTIONS') {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type',
+          'Access-Control-Max-Age': '86400'
+        }
+      });
+    }
+
+    // ── Endpoint app web: GET /api/empleados ──
+    // Devuelve { empleados: ["Nombre 1", "Nombre 2", ...] } para el dropdown del frontend
+    if (url.pathname === '/api/empleados' && request.method === 'GET') {
+      try {
+        const datos = await csv(ID.CHECADOR, 'TURNOS_DEFAULT');
+        const empleados = datos
+          ? datos.slice(1)
+              .map(r => String(r[1] || '').trim())
+              .filter(n => n && n.length > 1)
+              .sort(function(a,b){ return a.localeCompare(b, 'es'); })
+          : [];
+        return jsonCors({ empleados: empleados });
+      } catch(e) {
+        return jsonCors({ error: e.message, empleados: [] }, 500);
+      }
+    }
+
+    // ── Endpoint app web: POST /api/query { message: "..." } ──
+    // Devuelve { messages: ["html1", "html2", ...] } con todas las respuestas
+    if (url.pathname === '/api/query' && request.method === 'POST') {
+      let body;
+      try { body = await request.json(); } catch(e) {
+        return jsonCors({ error: 'JSON inválido' }, 400);
+      }
+      const texto = String(body.message || '').trim();
+      if (!texto) return jsonCors({ error: 'message vacío' }, 400);
+
+      // chatId único para esta sesión web; el prefijo 'web:' activa el buffer
+      const chatId = 'web:' + (body.session || Math.random().toString(36).slice(2));
+      const nombre = body.user || 'Web';
+
+      // Limpiar buffer previo de esta sesión
+      _webBuffer.delete(chatId);
+
+      try {
+        await router(chatId, texto, nombre, env);
+      } catch(e) {
+        return jsonCors({ error: e.message, messages: _webBuffer.get(chatId) || [] }, 500);
+      }
+
+      const messages = _webBuffer.get(chatId) || [];
+      _webBuffer.delete(chatId);
+      return jsonCors({ messages: messages });
+    }
+
+    if (request.method === 'GET') return new Response('Bot Electronics México ✅', { status:200 });
+    if (request.method !== 'POST') return new Response('Method not allowed', { status:405 });
+    let body;
+    try { body = await request.json(); } catch(e) { return ok200(); }
+    ctx.waitUntil(procesarBody(body, env));
+    return ok200();
+  }
+};
+
+function ok200() {
+  return new Response('{"ok":true}', { status:200, headers:{'Content-Type':'application/json'} });
+}
+
+function jsonCors(obj, status) {
+  return new Response(JSON.stringify(obj), {
+    status: status || 200,
+    headers: {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*'
+    }
+  });
+}
+
+async function procesarBody(body, env) {
+  try {
+    // Mensaje de texto normal
+    const msg = body.message || body.edited_message;
+    if (msg && msg.text) {
+      const chatId = String(msg.chat.id);
+      const texto  = msg.text.trim();
+      const nombre = msg.from.first_name || 'Usuario';
+      console.log('['+chatId+']: '+texto);
+      await router(chatId, texto, nombre, env);
+      return;
+    }
+
+    // Callback de botón inline
+    const cb = body.callback_query;
+    if (cb) {
+      const chatId  = String(cb.message.chat.id);
+      const data    = cb.data || '';
+      const nombre  = cb.from.first_name || 'Usuario';
+      console.log('['+chatId+'] callback: '+data);
+      await fetch(TELEGRAM_API+'/answerCallbackQuery', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ callback_query_id: cb.id })
+      });
+      if (data.startsWith('intent:')) {
+        const intent = data.replace('intent:', '');
+        if (intent === '__menu__') await mostrarMenuIntents(chatId);
+        else await mostrarFrasesIntent(chatId, intent);
+      } else if (data.startsWith('cat:')) {
+        await mostrarIntentsDeCat(chatId, data.replace('cat:', ''));
+      } else if (data.startsWith('frase:')) {
+        await router(chatId, data.replace('frase:', ''), nombre, env);
+      }
+    }
+  } catch(e) { console.error('procesarBody:', e.message); }
+}
+
+// ============================================================
+// ROUTER
+// ============================================================
+
+async function router(chatId, texto, nombre, env) {
+  const cmd = texto.toLowerCase().trim();
+
+  if (cmd === '/start' || cmd === '/ayuda' || cmd === 'ayuda') { await enviar(chatId, '👋 Hola <b>'+esc(nombre)+'</b>! Escríbeme lo que necesitas.'); return; }
+  if (cmd === '/miid')    { await enviar(chatId, '🆔 <b>Chat ID:</b> <code>'+chatId+'</code>'); return; }
+  if (cmd === '/stock')   { await stockBajo(chatId); return; }
+  if (cmd === '/reporte') { await reporteInventario(chatId); return; }
+  if (cmd === '/olvida' || cmd === 'olvida') { limpiarHistorial(chatId); await enviar(chatId, '🧹 Conversación borrada. Empezamos de cero.'); return; }
+
+  // Normalizar texto para detección flexible (sin acentos, minúsculas)
+  const tNorm = sinAcentos(texto.toLowerCase().trim());
+
+  // ── Helpers de detección ──────────────────────────────────────────
+  function tiene(re) { return re.test(tNorm); }
+
+  // Extrae el argumento quitando las palabras clave del comando
+  function args(...palabras) {
+    let r = tNorm;
+    palabras.forEach(function(p){ r = r.replace(new RegExp('\\b'+p+'\\b','g'),''); });
+    return r.replace(/\s+/g,' ').trim();
+  }
+
+  // ── VENTIAPP ──────────────────────────────────────────────────────
+  // GYM — "gym" / "gym [nombre]"
+  if (tiene(/\bgym\b/) || tiene(/\bgimnasio\b/)) {
+    const a = args('gym','gimnasio');
+    await cmdGym(chatId, a); return;
+  }
+
+  // CHECK CHOFERES — "check hoy" / "check ayer Eric" / "check Eric hoy"
+  if (tiene(/\bcheck\b/)) {
+    const a = args('check');
+    await cmdCheck(chatId, a); return;
+  }
+
+  // KILLERS — "killers" / "killers 3027" / "killers Sony"
+  if (tiene(/\bkillers?\b/)) {
+    const a = args('killers','killer');
+    await cmdKillers(chatId, a); return;
+  }
+
+  // RETARDOS — empleados que perdieron bono por retraso (SIN BONO o RETARDO)
+  if (tiene(/retardos/) || tiene(/culpables/) || (tiene(/retardo/) && tiene(/quincena/))) {
+    await cmdRetardosBono(chatId); return;
+  }
+
+  // BONO DE PUNTUALIDAD — "bono puntualidad" / "bono" / "puntualidad bono"
+  if (tiene(/bono/) || tiene(/bono\s+puntualidad/)) {
+    await cmdBonoPuntualidad(chatId); return;
+  }
+
+  // "ventiapp stock 3093" / "3093 ventiapp" / "ventiapp 3093 walmart"
+  if (tiene(/ventiapp/) && !tiene(/sin\s+publicar|falta|urgente|mas\s+stock/)) {
+    const a = args('ventiapp','stock');
+    await cmdVentiStock(chatId, a || ''); return;
+  }
+
+  // sin publicar + falta → falta poco (cualquier orden)
+  if (tiene(/sin\s+publicar/) && tiene(/falta/)) { await cmdVentiFaltaPoco(chatId); return; }
+  // sin publicar + urgente → urgente publicar (cualquier orden)
+  if (tiene(/sin\s+publicar/) && tiene(/urgente/)) { await cmdVentiUrgente(chatId); return; }
+  // ventiapp + falta (sin "sin publicar")
+  if (tiene(/ventiapp/) && tiene(/falta/)) { await cmdVentiFaltaPoco(chatId); return; }
+  // ventiapp + urgente
+  if (tiene(/ventiapp/) && tiene(/urgente/)) { await cmdVentiUrgente(chatId); return; }
+  // falta poco / falta sin publicar
+  if (tiene(/falta\s+poco/) || (tiene(/falta/) && tiene(/sin\s+publicar/))) { await cmdVentiFaltaPoco(chatId); return; }
+  // urgente publicar / urgente sin publicar
+  if (tiene(/urgente\s+publicar/) || (tiene(/urgente/) && tiene(/sin\s+publicar/))) { await cmdVentiUrgente(chatId); return; }
+
+  // "sin publicar [SKU]" / "sin publicar"
+  if (tiene(/sin\s+publicar/)) {
+    const a = args('sin','publicar');
+    await cmdVentiSinCanal(chatId, a); return;
+  }
+
+  // "más stock venti" / "stock venti mas que odoo" — cualquier orden
+  if (tiene(/stock/) && tiene(/venti/) && tiene(/mas|m[aá]s/)) { await cmdVentiMasStock(chatId); return; }
+  if (tiene(/mas\s+stock\s+venti/) || tiene(/stock\s+venti\s+(?:que\s+)?odoo/)) { await cmdVentiMasStock(chatId); return; }
+
+  // ── BODEGA ─────────────────────────────────────────────────────────
+  // "bodega A023" / "A023 bodega"
+  if (tiene(/bodega/)) {
+    const a = args('bodega');
+    await cmdBodega(chatId, a); return;
+  }
+
+  // ── SKU EXACTO ─────────────────────────────────────────────────────
+  if (tiene(/^sku\s/)) {
+    const a = args('sku');
+    await buscarSKU(chatId, a); return;
+  }
+
+  // ── VENTAS ─────────────────────────────────────────────────────────
+  // "venta walmart" / "walmart venta" / "ventas hoy walmart" / "venta 609107..."
+  if (tiene(/^ventas?\b/) || (tiene(/venta/) && Object.keys(CANALES).some(function(k){ return tNorm.indexOf(k) !== -1; }))) {
+    const a = args('venta','ventas');
+    const tieneCanal = Object.keys(CANALES).some(function(k){ return a.indexOf(k) !== -1; });
+    if (!tieneCanal && a.length > 3) { await cmdVentaBuscarSO(chatId, a); }
+    else { await cmdVenta(chatId, a); }
+    return;
+  }
+
+  // ── PRECIOS ERRÓNEOS ───────────────────────────────────────────────
+  // "precios erroneos" / "erroneos precios" / "alertas precios"
+  if (tiene(/precios?\s+err[oe]neos?/) || tiene(/err[oe]neos?\s+precios?/) || tiene(/alertas?\s+(?:de\s+)?precios?/)) {
+    const a = args('precios','precio','erroneos','erroneas','alertas','alerta','de');
+    await cmdPreciosErroneos(chatId, a); return;
+  }
+
+  // ── VENDEDORES INCORRECTOS ─────────────────────────────────────────
+  // "vendedores incorrectos" / "incorrectos vendedores"
+  if (tiene(/vendedores?\s+incorrectos?/) || tiene(/incorrectos?\s+vendedores?/)) {
+    const a = args('vendedores','vendedor','incorrectos','incorrecto');
+    await cmdVendedorIncorrecto(chatId, a); return;
+  }
+
+  // ── SOBREVENTA ─────────────────────────────────────────────────────
+  if (tiene(/sobreventa/)) {
+    const a = args('sobreventa');
+    await cmdSobreventa(chatId, a); return;
+  }
+
+  // ── POR RECIBIR ─────────────────────────────────────────────────────
+  // "por recibir" / "recibir por" / "pendiente por recibir"
+  if (tiene(/por\s+recibir/) || tiene(/recibir\s+por/) || (tiene(/recibir/) && tiene(/por/))) {
+    const a = args('por','recibir');
+    await cmdPorRecibir(chatId, a); return;
+  }
+
+  // ── CHECADOR — REPORTE GENERAL ─────────────────────────────────────
+  // ── CHECADOR ───────────────────────────────────────────────────────
+  if (tiene(/checador/) || tiene(/reporte\s+(?:de\s+)?asistencia/) || tiene(/asistencia\s+reporte/)) {
+    const estatusKW = ['faltas?','retardos?','puntual(?:es)?','vacaciones?','enfermedades?'];
+    const estatusRE = new RegExp('\\b('+estatusKW.join('|')+')\\b','i');
+    const mEst = tNorm.match(estatusRE);
+    if (mEst) {
+      // "checador faltas hoy" / "faltas checador" / etc.
+      const a = args('checador', mEst[0]);
+      await cmdChEstatus(chatId, mEst[0], a); return;
+    }
+    // Sin keyword de estatus → reporte general de asistencia
+    const a = args('checador','reporte','de','asistencia');
+    await cmdReporteAsistencia(chatId, a||'hoy'); return;
+  }
+
+  // ── ALERTAS CHECADOR ───────────────────────────────────────────────
+  if (tiene(/^alertas?(\s|$)/) && !tiene(/precios?/)) {
+    const a = args('alertas','alerta','empleados','empleados','empleado');
+    await cmdChAlertas(chatId, a); return;
+  }
+
+  // ── ESTATUS CHECADOR SUELTO — "faltas hoy" / "puntuales marzo" / etc.
+  // (sin la palabra "checador" delante; equivalente a "checador faltas ...")
+  // No incluye "retardos" porque ese tiene su propio bloque (bono).
+  if (tiene(/^(faltas?|puntual(?:es)?|inhabil(?:es)?)\b/)) {
+    const m = tNorm.match(/^(faltas?|puntual(?:es)?|inhabil(?:es)?)\b/);
+    if (m) {
+      const a = args(m[0]);
+      await cmdChEstatus(chatId, m[0], a); return;
+    }
+  }
+
+  // ── ASISTENCIA ─────────────────────────────────────────────────────
+  // "asistencia Victor" / "Victor asistencia"
+  if (tiene(/asistencia/)) {
+    const a = args('asistencia');
+    if (a) { await cmdAsistencia(chatId, a); return; }
+  }
+
+  // ── RESUMEN ────────────────────────────────────────────────────────
+  if (tiene(/^resumen\b/)) {
+    const a = args('resumen');
+    if (a) { await cmdResumen(chatId, a); return; }
+  }
+
+  // ── VACACIONES ─────────────────────────────────────────────────────
+  if (tiene(/^vacaciones?\b/)) {
+    const a = args('vacaciones','vacacion');
+    await cmdVacaciones(chatId, a); return;
+  }
+
+  // ── ENFERMEDADES ───────────────────────────────────────────────────
+  if (tiene(/^enfermedades?\b/)) {
+    const a = args('enfermedades','enfermedad');
+    await cmdEnfermedades(chatId, a); return;
+  }
+
+  // ── TURNO / HORARIO ────────────────────────────────────────────────
+  // "turno Victor" / "Victor turno" / "horario Victor"
+  if (tiene(/\bturno\b/) || tiene(/\bhorario\b/)) {
+    const a = args('turno','horario');
+    await cmdTurno(chatId, a); return;
+  }
+
+  // ── TRASLADOS ──────────────────────────────────────────────────────
+  // "traslados walmart hoy" / "walmart traslados hoy"
+  if (tiene(/traslados?/)) {
+    const a = args('traslados','traslado');
+    await cmdTraslados(chatId, a); return;
+  }
+
+  // ── PRECIOS ────────────────────────────────────────────────────────
+  // "precio HP" / "HP precio" / "precio walmart Samsung" / "Samsung precio walmart"
+  if (tiene(/\bprecios?\b/) && !tiene(/err[oe]neos?/)) {
+    const a = args('precio','precios');
+    await cmdPrecios(chatId, a); return;
+  }
+
+  // ── ENTRADAS ───────────────────────────────────────────────────────
+  if (tiene(/^entradas?\b/)) {
+    const a = args('entradas','entrada');
+    await cmdEntradas(chatId, a); return;
+  }
+
+  // Fallback final: chatbot → inventario → AI si inventario no encuentra nada
+  if (texto.length >= 2 && !texto.startsWith('/')) {
+    const respChat = await buscarChatbot(texto);
+    if (respChat) { await enviar(chatId, respChat); return; }
+
+    // Intentar inventario primero
+    const hayResultados = await cmdInventarioBuscando(chatId, texto);
+    if (!hayResultados) {
+      // Sin resultados en inventario → AI
+      await preguntarGemini(chatId, texto, env);
+    }
+    return;
+  }
+  await enviar(chatId, '❓ No entendí. Escribe <b>ayuda</b>.');
+}
+
+// ============================================================
+// INVENTARIO
+// ============================================================
+
+// ============================================================
+// VENTIAPP — FALTA POCO (6-8 canales activos)
+// ============================================================
+
+async function cmdVentiFaltaPoco(chatId) {
+  await enviar(chatId, '🟡 Falta poco — SKUs casi completos...');
+
+  const datos = await csv(ID_VENTI, '🔴 Stock sin canal');
+  if (!datos || datos.length < 3) { await enviar(chatId, '❌ Sin acceso a la hoja.'); return; }
+
+  const CANAL_COLS = [VENTI_SC.ML, VENTI_SC.WMT, VENTI_SC.TN, VENTI_SC.COP,
+                      VENTI_SC.ELK, VENTI_SC.TP, VENTI_SC.T1, VENTI_SC.LIV, VENTI_SC.TT];
+  const N_CANALES = 9;
+
+  function esActivo(val) {
+    return val !== '-' && val !== null && val !== undefined && String(val).trim() !== '';
+  }
+
+  const filas = datos.slice(2).filter(function(r){ return String(r[VENTI_SC.SKU]||'').trim(); });
+
+  // Clasificar por canales activos: 6, 7, 8
+  const grupos = { 8:[], 7:[], 6:[] };
+  filas.forEach(function(r) {
+    const activos = CANAL_COLS.filter(function(col){ return esActivo(r[col]); }).length;
+    if (activos >= 6 && activos <= 8) {
+      const faltantes = VENTI_SC_LABELS.filter(function(_, i){ return !esActivo(r[CANAL_COLS[i]]); });
+      grupos[activos].push({ sku: r[VENTI_SC.SKU], stock: r[VENTI_SC.STOCK_ODOO], faltantes });
+    }
+  });
+
+  // Canales que más faltan en el total
+  const faltanCount = {};
+  VENTI_SC_LABELS.forEach(function(l){ faltanCount[l] = 0; });
+  [8,7,6].forEach(function(n) {
+    grupos[n].forEach(function(item) {
+      item.faltantes.forEach(function(c){ faltanCount[c]++; });
+    });
+  });
+  const topFaltantes = Object.entries(faltanCount)
+    .filter(function(e){ return e[1] > 0; })
+    .sort(function(a,b){ return b[1]-a[1]; });
+
+  const total = grupos[8].length + grupos[7].length + grupos[6].length;
+
+  let tg = '🟡 <b>Falta poco — SKUs casi completos</b>\n'+
+           '📦 Total: <b>'+total+' SKUs</b> con 6-8/9 canales\n'+
+           '━━━━━━━━━━━━━━━━━\n'+
+           '📊 Distribución:\n'+
+           '• 8/9 canales: <b>'+grupos[8].length+' SKUs</b> (falta 1)\n'+
+           '• 7/9 canales: <b>'+grupos[7].length+' SKUs</b> (faltan 2)\n'+
+           '• 6/9 canales: <b>'+grupos[6].length+' SKUs</b> (faltan 3)\n\n'+
+           '🎯 Canales con más oportunidad:\n';
+
+  topFaltantes.slice(0,5).forEach(function(e) {
+    tg += '• <b>'+esc(e[0])+'</b>: '+e[1]+' SKUs pendientes\n';
+  });
+
+  // Top 5 por stock de cada grupo
+  [8,7,6].forEach(function(n) {
+    if (!grupos[n].length) return;
+    const top = grupos[n].sort(function(a,b){ return (b.stock||0)-(a.stock||0); }).slice(0,5);
+    tg += '\n<b>'+n+'/9 canales — Top por stock:</b>\n';
+    top.forEach(function(item) {
+      tg += '• <code>'+esc(String(item.sku))+'</code> · stock: <b>'+
+            Number(item.stock||0).toLocaleString()+'</b> · falta: '+
+            esc(item.faltantes.join(', '))+'\n';
+    });
+  });
+  await enviar(chatId, tg);
+}
+
+// ============================================================
+// VENTIAPP — URGENTE PUBLICAR (0 canales con stock significativo)
+// ============================================================
+
+async function cmdVentiUrgente(chatId) {
+  await enviar(chatId, '🚨 Urgente publicar — SKUs sin ningún canal...');
+
+  const datos = await csv(ID_VENTI, '🔴 Stock sin canal');
+  if (!datos || datos.length < 3) { await enviar(chatId, '❌ Sin acceso a la hoja.'); return; }
+
+  const CANAL_COLS = [VENTI_SC.ML, VENTI_SC.WMT, VENTI_SC.TN, VENTI_SC.COP,
+                      VENTI_SC.ELK, VENTI_SC.TP, VENTI_SC.T1, VENTI_SC.LIV, VENTI_SC.TT];
+
+  function esActivo(val) {
+    return val !== '-' && val !== null && val !== undefined && String(val).trim() !== '';
+  }
+
+  const filas = datos.slice(2).filter(function(r){ return String(r[VENTI_SC.SKU]||'').trim(); });
+
+  // Solo SKUs con 0 canales activos
+  const sinCanal = filas.filter(function(r) {
+    return CANAL_COLS.every(function(col){ return !esActivo(r[col]); });
+  });
+
+  // Ordenar por stock descendente
+  sinCanal.sort(function(a,b){ return (b[VENTI_SC.STOCK_ODOO]||0)-(a[VENTI_SC.STOCK_ODOO]||0); });
+
+  // Separar: con stock real (>0) vs stock 0 o negativo
+  const conStock    = sinCanal.filter(function(r){ return (r[VENTI_SC.STOCK_ODOO]||0) > 0; });
+  const sinStock    = sinCanal.filter(function(r){ return (r[VENTI_SC.STOCK_ODOO]||0) <= 0; });
+  const stockTotal  = conStock.reduce(function(acc,r){ return acc+(r[VENTI_SC.STOCK_ODOO]||0); }, 0);
+
+  let tg = '🚨 <b>Urgente publicar</b>\n'+
+           '❌ SKUs con <b>0 canales activos</b>\n'+
+           '━━━━━━━━━━━━━━━━━\n'+
+           '📦 Total sin canal: <b>'+sinCanal.length+' SKUs</b>\n'+
+           '📊 Con stock disponible: <b>'+conStock.length+' SKUs</b>\n'+
+           '🔢 Stock total sin publicar: <b>'+stockTotal.toLocaleString()+' uds</b>\n'+
+           '⚪ Sin stock: <b>'+sinStock.length+' SKUs</b>\n\n';
+
+  if (conStock.length) {
+    tg += '🔴 <b>Con stock — ordenado por urgencia:</b>\n';
+    conStock.slice(0, 15).forEach(function(r, i) {
+      const sku   = String(r[VENTI_SC.SKU]||'-');
+      const stock = Number(r[VENTI_SC.STOCK_ODOO]||0).toLocaleString();
+      tg += (i+1)+'. <code>'+esc(sku)+'</code> · <b>'+stock+' uds</b>\n';
+    });
+    if (conStock.length > 15) tg += '...y '+(conStock.length-15)+' más.\n';
+  }
+  await enviar(chatId, tg);
+}
+
+// ============================================================
+// VENTIAPP — CONCENTRADO (stock, precio, status por SKU)
+// ============================================================
+
+async function cmdVentiStock(chatId, consulta) {
+  // Separar SKUs de marketplace
+  // Ej: "3093 walmart" / "3093, 4521 ml, walmart" / "3093"
+  const mpKeys = Object.keys(VENTI_MP);
+
+  // Detectar marketplaces al final de la consulta
+  const mpDetectados = [];
+  let resto = consulta;
+  for (const key of mpKeys) {
+    const re = new RegExp('\\b'+key+'\\b', 'i');
+    if (re.test(sinAcentos(resto))) {
+      mpDetectados.push(key);
+      resto = resto.replace(re, '').trim();
+    }
+  }
+
+  // Los SKUs son lo que queda (pueden ser varios separados por coma)
+  const skus = splitTerminos(resto).filter(function(s){ return s.length >= 3; });
+
+  if (!skus.length) {
+    await enviar(chatId, '❓ Indica al menos un SKU. Ej: <code>ventiapp stock 3093</code>');
+    return;
+  }
+
+  // Qué marketplaces mostrar
+  const mpsAMostrar = mpDetectados.length ? mpDetectados : VENTI_ALL_MP.concat(['totales','odoo']);
+
+  await enviar(chatId, '📊 Ventiapp · buscando <b>'+esc(skus.join(', '))+'</b>...');
+
+  const datos = await csv(ID_VENTI, '📊 CONCENTRADO');
+  if (!datos || datos.length < 3) { await enviar(chatId, '❌ Sin acceso al concentrado Ventiapp.'); return; }
+
+  // Datos desde fila 3 (índice 2)
+  const filas = datos.slice(2);
+
+  for (const sku of skus) {
+    const tl = sinAcentos(sku);
+    const fila = filas.find(function(r){ return sinAcentos(String(r[0]||'')).indexOf(tl) !== -1; });
+
+    if (!fila) { await enviar(chatId, '😔 SKU "'+esc(sku)+'" no encontrado en Ventiapp.'); continue; }
+
+    let tg = '📊 <b>'+esc(String(fila[0]))+'</b>\n━━━━━━━━━━━━━━━━━\n';
+
+    for (const mpKey of mpsAMostrar) {
+      const mp = VENTI_MP[mpKey];
+      if (!mp) continue;
+
+      const stock  = fila[mp.stock];
+      const precio = mp.precio !== null ? fila[mp.precio] : null;
+      const status = mp.status !== null ? fila[mp.status] : null;
+      const canales= mp.canales !== undefined ? fila[mp.canales] : null;
+
+      // Skip si no hay datos
+      if (stock === null || stock === undefined || stock === '') continue;
+
+      const stockStr = stock === '-' ? '—' : String(stock);
+      let line = '\n<b>'+esc(mp.label)+'</b>\n';
+      line += '   📦 Stock: <b>'+esc(stockStr)+'</b>\n';
+      if (precio !== null && precio !== undefined && precio !== '') {
+        line += '   💵 Precio: $'+Number(precio).toLocaleString('es-MX', {minimumFractionDigits:2})+'\n';
+      }
+      if (status !== null && status !== undefined && status !== '') {
+        const st = String(status);
+        const stIcon = /activ/i.test(st) ? '🟢' : /inactiv|pausad/i.test(st) ? '🔴' : '🟡';
+        line += '   '+stIcon+' Status: '+esc(st)+'\n';
+      }
+      if (canales !== null && canales !== undefined) {
+        line += '   🔢 Canales: '+esc(String(canales))+'\n';
+      }
+      tg += line;
+    }
+  await enviar(chatId, tg);
+  }
+}
+
+// ============================================================
+// VENTIAPP — STOCK SIN CANAL
+// ============================================================
+
+async function cmdVentiSinCanal(chatId, consulta) {
+  const skus = consulta ? splitTerminos(consulta) : [];
+
+  await enviar(chatId, '🔴 Stock sin canal'+(skus.length?' · '+esc(consulta):'')+'...');
+
+  const datos = await csv(ID_VENTI, '🔴 Stock sin canal');
+  if (!datos || datos.length < 3) { await enviar(chatId, '❌ Sin acceso a la hoja Stock sin canal.'); return; }
+
+  // Headers en fila 2 (índice 1), datos desde fila 3 (índice 2)
+  const filas = datos.slice(2).filter(function(r){ return String(r[VENTI_SC.SKU]||'').trim(); });
+
+  // Helper: canales activos de las 9 columnas D-L (índices 3-11)
+  const CANAL_COLS = [VENTI_SC.ML, VENTI_SC.WMT, VENTI_SC.TN, VENTI_SC.COP,
+                      VENTI_SC.ELK, VENTI_SC.TP, VENTI_SC.T1, VENTI_SC.LIV, VENTI_SC.TT];
+  const N_CANALES = 9;
+
+  function esActivo(val) {
+    return val !== '-' && val !== null && val !== undefined && String(val).trim() !== '';
+  }
+  function pctPublicado(fila) {
+    const activos = CANAL_COLS.filter(function(col){ return esActivo(fila[col]); }).length;
+    return ((activos / N_CANALES) * 100).toFixed(0) + '%';
+  }
+
+  if (skus.length) {
+    // Búsqueda por SKU específico
+    for (const sku of skus) {
+      const tl = sinAcentos(sku);
+      const fila = filas.find(function(r){ return sinAcentos(String(r[VENTI_SC.SKU]||'')).indexOf(tl) !== -1; });
+
+      if (!fila) { await enviar(chatId, '😔 SKU "'+esc(sku)+'" no encontrado.'); continue; }
+
+      const activosCount = CANAL_COLS.filter(function(col){ return esActivo(fila[col]); }).length;
+      const pct = pctPublicado(fila);
+
+      let tg = '🔴 <b>'+esc(String(fila[VENTI_SC.SKU]))+'</b>\n'+
+               '📦 Stock Odoo: <b>'+esc(String(fila[VENTI_SC.STOCK_ODOO]||'-'))+'</b>\n'+
+               '🔢 Canales activos: <b>'+activosCount+' / '+N_CANALES+'</b>\n'+
+               '📊 % Publicado: <b>'+pct+'</b>\n'+
+               '━━━━━━━━━━━━━━━━━\n';
+
+      CANAL_COLS.forEach(function(col, i) {
+        const val = fila[col];
+        const activo = esActivo(val);
+        const icon = activo ? '🟢' : '🔴';
+        tg += icon+' '+VENTI_SC_LABELS[i]+': '+(activo ? esc(String(val)) : 'Sin publicar')+'\n';
+      });
+
+      await enviar(chatId, tg);
+    }
+    return;
+  }
+
+  // Resumen general
+  const total = filas.length;
+  let conAlguno = 0, sinNinguno = 0;
+  const porCanal = {};
+  VENTI_SC_LABELS.forEach(function(l){ porCanal[l] = { activos:0, inactivos:0 }; });
+  let sumaActivos = 0;
+
+  filas.forEach(function(r) {
+    let tieneAlguno = false;
+    CANAL_COLS.forEach(function(col, i) {
+      const act = esActivo(r[col]);
+      if (act) { porCanal[VENTI_SC_LABELS[i]].activos++; tieneAlguno = true; sumaActivos++; }
+      else        porCanal[VENTI_SC_LABELS[i]].inactivos++;
+    });
+    if (tieneAlguno) conAlguno++; else sinNinguno++;
+  });
+
+  // % publicado = total activos / (total SKUs * 9 canales)
+  const pctProm = total > 0 ? ((sumaActivos / (total * N_CANALES)) * 100).toFixed(1) : '0';
+
+  let tg = '🔴 <b>Stock sin canal — Resumen</b>\n'+
+           '📦 Total SKUs: <b>'+total+'</b>\n'+
+           '🟢 Con al menos 1 canal: <b>'+conAlguno+'</b>\n'+
+           '🔴 Sin ningún canal: <b>'+sinNinguno+'</b>\n'+
+           '📊 % Publicado promedio: <b>'+pctProm+'%</b>\n'+
+           '━━━━━━━━━━━━━━━━━\n'+
+           'Por canal (activos / sin publicar):\n\n';
+
+  VENTI_SC_LABELS.forEach(function(label) {
+    const d = porCanal[label];
+    tg += '• <b>'+esc(label)+'</b>: 🟢 '+d.activos+' activos · 🔴 '+d.inactivos+' sin publicar\n';
+  });
+  await enviar(chatId, tg);
+}
+
+// ============================================================
+// VENTIAPP — MÁS STOCK VENTI QUE ODOO
+// ============================================================
+
+async function cmdVentiMasStock(chatId) {
+  await enviar(chatId, '🟡 Más stock Venti que Odoo...');
+
+  const datos = await csv(ID_VENTI, '🟡 Más stock Venti que Odoo');
+  if (!datos || datos.length < 3) { await enviar(chatId, '❌ Sin acceso a la hoja.'); return; }
+
+  // Datos desde fila 3 (índice 2)
+  const filas = datos.slice(2).filter(function(r){ return String(r[VENTI_MS.SKU]||'').trim(); });
+
+  const total = filas.length;
+  const resumen = {}; // label → { skus: count, exceso_total: sum }
+  VENTI_MS_MP.forEach(function(mp){ resumen[mp.label] = { count:0, exceso:0 }; });
+
+  filas.forEach(function(r) {
+    VENTI_MS_MP.forEach(function(mp) {
+      const canal  = r[mp.canal];
+      const exceso = r[mp.exceso];
+      // Solo cuenta si exceso es número positivo
+      const ex = parseFloat(String(exceso||'0').replace(/[^0-9.-]/g,''));
+      if (!isNaN(ex) && ex > 0) {
+        resumen[mp.label].count++;
+        resumen[mp.label].exceso += ex;
+      }
+    });
+  });
+
+  let tg = '🟡 <b>Más stock Venti que Odoo</b>\n'+
+           '📦 Total SKUs afectados: <b>'+total+'</b>\n'+
+           '━━━━━━━━━━━━━━━━━\n'+
+           'SKUs con exceso por canal:\n\n';
+
+  VENTI_MS_MP.forEach(function(mp) {
+    const d = resumen[mp.label];
+    if (d.count > 0) {
+      tg += '• <b>'+esc(mp.label)+'</b>: '+d.count+' SKUs · exceso total: <b>'+d.exceso.toLocaleString()+'</b> uds\n';
+    } else {
+      tg += '• <b>'+esc(mp.label)+'</b>: ✅ Sin exceso\n';
+    }
+  });
+  await enviar(chatId, tg);
+}
+
+// ============================================================
+// BODEGA — busca productos por ubicación en bodega
+// ============================================================
+
+async function cmdBodega(chatId, termino) {
+  const terminos = splitTerminos(termino);
+  if (terminos.length > 1) {
+    for (const t of terminos) await cmdBodega(chatId, t);
+    return;
+  }
+
+  await enviar(chatId, '🏭 Bodega "'+esc(termino)+'"...');
+  const datos = await csv(ID.INVENTARIO, 'Inventarios');
+  if (!datos) { await enviar(chatId, '❌ Sin acceso al inventario.'); return; }
+
+  const tl = sinAcentos(termino);
+  const res = datos.slice(1).filter(function(r) {
+    const bodega = sinAcentos(String(r[INV.BODEGA]||''));
+    const sku    = sinAcentos(String(r[INV.SKU]||''));
+    const ref    = sinAcentos(String(r[INV.REF]||''));
+    const modelo = sinAcentos(String(r[INV.MODELO]||''));
+    const nombre = sinAcentos(String(r[INV.NOMBRE]||''));
+    return bodega.indexOf(tl) !== -1 || sku.indexOf(tl) !== -1 ||
+           ref.indexOf(tl) !== -1 || modelo.indexOf(tl) !== -1 ||
+           nombre.indexOf(tl) !== -1;
+  });
+
+  console.log('Bodega "'+termino+'": '+res.length);
+  if (!res.length) { await enviar(chatId, '😔 Sin resultados para bodega "'+esc(termino)+'".'); return; }
+
+  const top = res.slice(0, MAX_RES);
+  let tg = '🏭 <b>Bodega · '+esc(termino)+'</b>\n'+res.length+' producto(s)\n━━━━━━━━━━━━━━━━━\n\n';
+
+  top.forEach(function(r, i) {
+    const d = num(r[INV.DISP]);
+    const ic = icon(d);
+    // Limpiar bodega: quitar prefijo "Almacén/Existencias/"
+    const bodega = String(r[INV.BODEGA]||'-').replace(/Almacén\/Existencias\//g, '').replace(/Almacen\/Existencias\//g, '');
+    tg += (i+1)+'. <b>'+esc(r[INV.MARCA]||'-')+'</b> '+esc(r[INV.NOMBRE]||'-')+'\n'+
+          '   🔑 <code>'+esc(r[INV.SKU]||'-')+'</code>\n'+
+          '   🏭 '+esc(bodega)+'\n'+
+          '   '+ic+' Stock: <b>'+d.toLocaleString()+'</b>\n\n';
+  });
+  if (res.length > MAX_RES) tg += '...y '+(res.length-MAX_RES)+' más.';
+  await enviar(chatId, tg);
+}
+
+// Versión silenciosa de inventario que devuelve true si encontró resultados
+async function cmdInventarioBuscando(chatId, consulta) {
+  const { termino, stockOp, stockVal } = parsearConsulta(consulta);
+
+  // Si tiene filtros de stock explícitos → siempre es búsqueda de inventario
+  if (stockOp) {
+    await cmdInventario(chatId, consulta);
+    return true;
+  }
+
+  const datos = await csv(ID.INVENTARIO, 'Inventarios');
+  if (!datos) return false;
+
+  const tl = sinAcentos(termino);
+  if (!tl || tl.length < 2) return false;
+
+  const res = datos.slice(1).filter(function(r) {
+    return [INV.REF, INV.CAT, INV.MARCA, INV.NOMBRE, INV.MODELO, INV.SKU].some(function(i) {
+      const v = String(r[i]||'');
+      return v !== '#N/A' && v !== 'NO ESTA' && contiene(v, tl);
+    });
+  });
+
+  if (!res.length) return false; // no encontró nada → dejar pasar a AI
+
+  // Sí encontró → mostrar resultados normales
+  await cmdInventario(chatId, consulta);
+  return true;
+}
+
+async function cmdInventario(chatId, consulta) {
+  const { termino, stockOp, stockVal } = parsearConsulta(consulta);
+  const terminos = splitTerminos(termino);
+
+  // Si hay múltiples términos, ejecutar uno por uno
+  if (terminos.length > 1) {
+    for (const t of terminos) {
+      const c = stockOp ? t + ' stock ' + (stockOp==='gt'?'mayor a':stockOp==='lt'?'menor a':'igual a') + ' ' + stockVal : t;
+      await cmdInventario(chatId, c);
+    }
+    return;
+  }
+  const label = buildLabel(termino, stockOp, stockVal);
+  await enviar(chatId, '🔍 Buscando <b>'+esc(label)+'</b>...');
+  const datos = await csv(ID.INVENTARIO, 'Inventarios');
+  if (!datos) { await enviar(chatId,'❌ Sin acceso al inventario.'); return; }
+  const tl = termino;
+  let res = datos.slice(1).filter(function(r) {
+    const d = num(r[INV.DISP]);
+    if (!filtroStock(d, stockOp, stockVal)) return false;
+    if (!tl) return true;
+    return [INV.REF,INV.CAT,INV.MARCA,INV.NOMBRE,INV.MODELO,INV.SKU].some(function(i){
+      const v=String(r[i]||'');
+      return v!=='#N/A'&&v!=='NO ESTA'&&contiene(v, tl);
+    });
+  });
+  console.log('Inv "'+consulta+'": '+res.length);
+  if (!res.length) { await enviar(chatId,'😔 Sin resultados para <b>'+esc(label)+'</b>.'); return; }
+  if (stockOp) res.sort(function(a,b){return num(b[INV.DISP])-num(a[INV.DISP]);});
+  const top=res.slice(0,MAX_RES);
+  let tg='📦 <b>'+esc(label)+'</b> — '+res.length+' resultado(s)\n━━━━━━━━━━━━━━━━━\n\n';
+  let wa='📦 '+label+'\n'+res.length+' resultado(s)\n━━━━━━━━━━━━━━━━━\n\n';
+  top.forEach(function(r,i){
+    const d=num(r[INV.DISP]),ic=icon(d);
+    const bodega = String(r[INV.BODEGA]||'').replace(/Almacén\/Existencias\//g,'').replace(/Almacen\/Existencias\//g,'').trim();
+    tg+=(i+1)+'. <b>'+esc(r[INV.MARCA]||'-')+'</b> '+esc(r[INV.NOMBRE]||'-')+'\n'+
+        '   📋 <code>'+esc(r[INV.REF]||'-')+'</code> | <code>'+esc(r[INV.SKU]||'-')+'</code>\n'+
+        '   🎨 '+esc(r[INV.COLOR]||'-')+' | '+esc(r[INV.MODELO]||'-')+'\n'+
+        (bodega?'   🏭 '+esc(bodega)+'\n':'')+
+        '   '+ic+' Stock: <b>'+d.toLocaleString()+'</b>\n\n';
+    wa+=(i+1)+'. '+(r[INV.MARCA]||'-')+' '+(r[INV.NOMBRE]||'-')+' | '+ic+' '+d.toLocaleString()+'\n';
+  });
+  if (res.length>MAX_RES) tg+='...y '+(res.length-MAX_RES)+' más.';
+  await enviar(chatId,tg); await wa_send(chatId,wa);
+}
+
+async function stockBajo(chatId) {
+  await enviar(chatId,'📊 Revisando stock...');
+  const datos=await csv(ID.INVENTARIO,'Inventarios');
+  if (!datos){await enviar(chatId,'❌ Sin acceso.');return;}
+  const filas=datos.slice(1).filter(function(r){return String(r[0]||'').trim()&&r[0]!=='NO ESTA';});
+  const sin=filas.filter(function(r){return num(r[INV.DISP])<=0;});
+  const bajo=filas.filter(function(r){const d=num(r[INV.DISP]);return d>0&&d<=5;});
+  if (!sin.length&&!bajo.length){await enviar(chatId,'✅ Todo el inventario con stock suficiente.');return;}
+  let tg='⚠️ <b>ALERTA DE STOCK</b>\n━━━━━━━━━━━━━━━━━\n\n',wa='ALERTA DE STOCK\n\n';
+  if (sin.length){
+    tg+='🔴 <b>SIN STOCK ('+sin.length+'):</b>\n'; wa+='SIN STOCK ('+sin.length+'):\n';
+    sin.slice(0,6).forEach(function(r){tg+='🔴 '+esc(r[INV.MARCA]||'-')+' '+esc(r[INV.NOMBRE]||'-')+'\n';wa+='🔴 '+(r[INV.MARCA]||'-')+' '+(r[INV.NOMBRE]||'-')+'\n';});
+    if(sin.length>6)tg+='...y '+(sin.length-6)+' más\n';
+    tg+='\n';wa+='\n';
+  }
+  if (bajo.length){
+    tg+='🟡 <b>STOCK BAJO 1-5 ('+bajo.length+'):</b>\n'; wa+='STOCK BAJO 1-5 ('+bajo.length+'):\n';
+    bajo.slice(0,8).forEach(function(r){const d=num(r[INV.DISP]);tg+='🟡 '+esc(r[INV.MARCA]||'-')+' '+esc(r[INV.NOMBRE]||'-')+' | '+d+' pzs\n';wa+='🟡 '+(r[INV.MARCA]||'-')+' | '+d+' pzs\n';});
+    if(bajo.length>8)tg+='...y '+(bajo.length-8)+' más\n';
+  }
+  await enviar(chatId,tg);await wa_send(chatId,wa);
+}
+
+async function reporteInventario(chatId) {
+  await enviar(chatId,'📊 Generando reporte...');
+  const datos=await csv(ID.INVENTARIO,'Inventarios');
+  if (!datos){await enviar(chatId,'❌ Sin acceso.');return;}
+  const filas=datos.slice(1).filter(function(r){return String(r[0]||'').trim()&&r[0]!=='NO ESTA';});
+  const total=filas.length,sin=filas.filter(function(r){return num(r[INV.DISP])<=0;}).length;
+  const bajo=filas.filter(function(r){const d=num(r[INV.DISP]);return d>0&&d<=5;}).length;
+  const ok=total-sin-bajo;
+  const marcas=[...new Set(filas.map(function(r){return r[INV.MARCA];}).filter(Boolean))];
+  const hora=new Date().toLocaleString('es-MX',{timeZone:'America/Mexico_City'});
+  await enviar(chatId,'📊 <b>REPORTE DE INVENTARIO</b>\n📅 '+hora+'\n━━━━━━━━━━━━━━━━━\n\n'+
+    '📦 Total: <b>'+total.toLocaleString()+'</b>\n'+
+    '🟢 OK (&gt;5): <b>'+ok.toLocaleString()+'</b>\n'+
+    '🟡 Bajo (1-5): <b>'+bajo.toLocaleString()+'</b>\n'+
+    '🔴 Sin stock: <b>'+sin.toLocaleString()+'</b>\n\n'+
+    '🏢 Marcas ('+marcas.length+'): '+marcas.slice(0,8).map(esc).join(', ')+(marcas.length>8?'...':''));
+}
+
+async function buscarSKU(chatId,sku){
+  await enviar(chatId,'🔍 SKU <code>'+esc(sku)+'</code>...');
+  const datos=await csv(ID.INVENTARIO,'Inventarios');
+  if (!datos){await enviar(chatId,'❌ Sin acceso.');return;}
+  const res=datos.slice(1).filter(function(r){return sinAcentos(r[INV.SKU])===sinAcentos(sku);});
+  if (!res.length){await enviar(chatId,'😔 SKU no encontrado.');return;}
+  const r=res[0],d=num(r[INV.DISP]),ic=icon(d);
+  await enviar(chatId,'✅ <b>SKU Encontrado</b>\n\n'+
+    '📋 Ref: <code>'+esc(r[INV.REF]||'-')+'</code>\n'+
+    '🏷️ SKU: <code>'+esc(r[INV.SKU]||'-')+'</code>\n'+
+    '🏢 <b>'+esc(r[INV.MARCA]||'-')+'</b>\n'+
+    '📦 '+esc(r[INV.NOMBRE]||'-')+'\n'+
+    '🔧 '+esc(r[INV.MODELO]||'-')+' | 🎨 '+esc(r[INV.COLOR]||'-')+'\n'+
+    ic+' Stock: <b>'+d.toLocaleString()+'</b>');
+}
+
+// ============================================================
+// VENTAS POR CANAL
+// ============================================================
+
+async function cmdVenta(chatId, consulta) {
+  // Extraer fecha primero
+  const {fechaISO, fechaISOFin, fechaLabel, resto: restoFecha} = extraerFecha(consulta);
+
+  // Detectar todos los canales mencionados
+  let restoLower = restoFecha.toLowerCase();
+  const canalesEncontrados = [];
+  const keys=Object.keys(CANALES).sort(function(a,b){return b.length-a.length;});
+  for (const k of keys){
+    if (restoLower.indexOf(k)!==-1){
+      const hoja = CANALES[k];
+      if (canalesEncontrados.indexOf(hoja)===-1) canalesEncontrados.push(hoja);
+      restoLower=restoLower.replace(k,'').trim();
+    }
+  }
+
+  if (!canalesEncontrados.length){
+    await enviar(chatId,'❓ Indica el canal:\nwalmart · sears · liverpool · sanborns\ntiktok · coppel · ml · elektra\n\nEj: <code>venta walmart 25/03/2026</code>');
+    return;
+  }
+
+  // Ejecutar uno por uno si hay múltiples
+  for (const hojaCanal of canalesEncontrados) {
+    await enviar(chatId,'💰 <b>'+esc(hojaCanal)+'</b>'+(fechaLabel?' · <b>'+esc(fechaLabel)+'</b>':'')+'...');
+    const datos=await csv(ID.VENTA_DIARIA, hojaCanal);
+    if (!datos){await enviar(chatId,'❌ Sin acceso a "'+hojaCanal+'".');continue;}
+
+    let filas=datos.slice(1).filter(function(r){
+      return normalizarFecha(r[CANAL.FECHA]).length === 10;
+    });
+    if (fechaISO) filas=filas.filter(function(r){return coincideFecha(r[CANAL.FECHA], fechaISO, fechaISOFin);});
+    const terminoExtra=restoLower.trim();
+    if (terminoExtra){
+      filas=filas.filter(function(r){return[CANAL.SKU,CANAL.PRODUCTO,CANAL.SO].some(function(i){return contiene(r[i], terminoExtra);});});
+    }
+
+    console.log('Ventas '+hojaCanal+': '+filas.length);
+    if (!filas.length){await enviar(chatId,'😔 Sin ventas en <b>'+esc(hojaCanal)+'</b>'+(fechaLabel?' del '+fechaLabel:'')+'.');continue;}
+
+    let totalCant=0,totalImp=0,totalOrdenes=new Set();
+    filas.forEach(function(r){
+      totalCant+=num(r[CANAL.CANTIDAD]);
+      totalImp+=parseFloat(String(r[CANAL.IMPORTE]||'0').replace(/[$,]/g,''))||0;
+      totalOrdenes.add(String(r[CANAL.SO]||''));
+    });
+
+    // Siempre mostrar resumen consolidado + top SKUs
+    const porSKU = {};
+    filas.forEach(function(r) {
+      const sku  = String(r[CANAL.SKU]||'-');
+      const prod = String(r[CANAL.PRODUCTO]||'-').replace(/^\[.+?\]\s*/,'');
+      if (!porSKU[sku]) porSKU[sku] = { prod, cant:0, imp:0 };
+      porSKU[sku].cant += num(r[CANAL.CANTIDAD]);
+      porSKU[sku].imp  += parseFloat(String(r[CANAL.IMPORTE]||'0').replace(/[$,]/g,''))||0;
+    });
+    const topSKU = Object.entries(porSKU)
+      .sort(function(a,b){ return b[1].cant - a[1].cant; })
+      .slice(0, 10);
+
+    let tg = '💰 <b>'+esc(hojaCanal)+'</b>'+(fechaLabel?' · '+esc(fechaLabel):'')+'\n'+
+             '📦 '+filas.length+' líneas | '+totalOrdenes.size+' órdenes\n'+
+             '🛒 Qty total: <b>'+totalCant.toLocaleString()+'</b>\n'+
+             '💵 Importe: <b>$'+totalImp.toLocaleString('es-MX',{minimumFractionDigits:2})+'</b>\n'+
+             '━━━━━━━━━━━━━━━━━\n'+
+             '🔝 Top productos por cantidad:\n\n';
+
+    topSKU.forEach(function(entry, i) {
+      const [sku, d] = entry;
+      const prod = d.prod.substring(0,45)+(d.prod.length>45?'...':'');
+      tg += (i+1)+'. <b>'+esc(sku)+'</b>\n'+
+            '   '+esc(prod)+'\n'+
+            '   Qty: <b>'+d.cant.toLocaleString()+'</b> | $'+d.imp.toLocaleString('es-MX',{minimumFractionDigits:2})+'\n\n';
+    });
+    if (Object.keys(porSKU).length > 10) tg += '...y '+(Object.keys(porSKU).length-10)+' SKUs más.';
+  await enviar(chatId, tg);
+  }
+}
+
+// ============================================================
+// PRECIOS ERRÓNEOS — con filtro de fecha
+// ============================================================
+
+async function cmdPreciosErroneos(chatId, consulta) {
+  const {fechaISO, fechaISOFin, fechaLabel, resto} = extraerFecha(consulta);
+  const terminos = splitTerminos(resto.trim());
+
+  if (terminos.length > 1) {
+    for (const t of terminos) {
+      await cmdPreciosErroneos(chatId, t + (fechaLabel ? ' ' + fechaLabel : ''));
+    }
+    return;
+  }
+
+  const termino = terminos[0] || '';
+  await enviar(chatId,'⚠️ Precios erróneos'+(fechaLabel?' · <b>'+esc(fechaLabel)+'</b>':'')+(termino?' "'+esc(termino)+'"':'')+'...');
+  const datos=await csv(ID.VENTA_DIARIA,'Histórico de alertas');
+  if (!datos){await enviar(chatId,'❌ Sin acceso.');return;}
+
+  let filas=datos.filter(function(r){
+    const f = normalizarFecha(r[ALERTA.FECHA]);
+    return f.length === 10 && f.match(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  // ── EXCLUSIONES ───────────────────────────────────────────
+  // 1. Liverpool con centavos: descuentos legítimos (1ra compra, tarjeta Liverpool)
+  // 2. SKU NIN-BR201CCO-NEG-2997: precio negociado para ganar Buy Box
+  filas = filas.filter(function(r) {
+    const sku    = String(r[ALERTA.SKU]||'').trim().toUpperCase();
+    const venta  = parseFloat(String(r[ALERTA.VENTA]||'0').replace(/[$,]/g,'')) || 0;
+    const cliente= sinAcentos(String(r[ALERTA.CLIENTE]||'').toLowerCase());
+
+    // Excluir SKU específico
+    if (sku === 'NIN-BR201CCO-NEG-2997') return false;
+
+    // Excluir AMA-53034095-NEG-4699 cuando el cliente/canal es WALMART
+    if (sku === 'AMA-53034095-NEG-4699' && cliente.indexOf('walmart') !== -1) return false;
+
+    // Excluir Liverpool con centavos (descuento por 1ra compra o tarjeta Liverpool)
+    // Cualquier cliente que contenga "liv" (Liverpool, LIV, LIV-MEXICO, etc.)
+    const esLiverpool = cliente.indexOf('liv') !== -1;
+    const tieneCentavos = Math.abs(venta - Math.round(venta)) > 0.001;
+    if (esLiverpool && tieneCentavos) return false;
+
+    return true;
+  });
+
+  if (fechaISO) filas=filas.filter(function(r){return coincideFecha(r[ALERTA.FECHA], fechaISO, fechaISOFin);});
+  if (termino){
+    const tl=termino;
+    filas=filas.filter(function(r){return[ALERTA.SKU,ALERTA.CLIENTE,ALERTA.SO,ALERTA.VENDEDOR].some(function(i){return contiene(r[i], tl);});});
+  }
+
+  console.log('Precios erróneos "'+consulta+'": '+filas.length);
+  if (!filas.length){await enviar(chatId,'😔 Sin alertas de precios'+( fechaLabel||termino?' para los filtros indicados':'')+'.');return;}
+
+  let totalDiff=0;
+  filas.forEach(function(r){totalDiff+=parseFloat(String(r[ALERTA.DIFERENCIA]||'0').replace(/[$,]/g,''))||0;});
+
+  // Ordenar por fecha descendente (más reciente primero)
+  filas.sort(function(a,b){ return normalizarFecha(b[ALERTA.FECHA]).localeCompare(normalizarFecha(a[ALERTA.FECHA])); });
+  const top=filas.slice(0,MAX_RES);
+  let tg='⚠️ <b>Precios Erróneos</b>'+(fechaLabel?' · '+fechaLabel:'')+(termino?' · '+esc(termino):'')+'\n'+
+         filas.length+' alertas | Diff total: <b>$'+totalDiff.toLocaleString('es-MX',{minimumFractionDigits:2})+'</b>\n━━━━━━━━━━━━━━━━━\n\n';
+  let wa='PRECIOS ERRÓNEOS'+(fechaLabel?' '+fechaLabel:'')+(termino?' - '+termino:'')+'\n'+filas.length+' alertas\n\n';
+
+  top.forEach(function(r,i){
+    const fecha=normalizarFecha(r[ALERTA.FECHA]);
+    const diff=parseFloat(String(r[ALERTA.DIFERENCIA]||'0').replace(/[$,]/g,''))||0;
+    tg+=(i+1)+'. <b>'+esc(r[ALERTA.SKU]||'-')+'</b>\n'+
+        '   📅 '+esc(fecha)+' | 👤 '+esc(r[ALERTA.CLIENTE]||'-')+'\n'+
+        '   💵 Venta: '+String(r[ALERTA.VENTA]||'-')+' | Erik: '+String(r[ALERTA.ERIK]||'-')+' | <b>Diff: $'+Math.abs(diff).toFixed(2)+'</b>\n\n';
+    wa+=(i+1)+'. '+(r[ALERTA.SKU]||'-')+' | '+(r[ALERTA.CLIENTE]||'-')+' | Diff:$'+Math.abs(diff).toFixed(2)+'\n';
+  });
+  if (filas.length>MAX_RES) tg+='...y '+(filas.length-MAX_RES)+' más.';
+  await enviar(chatId,tg);await wa_send(chatId,wa);
+}
+
+// ============================================================
+// VENDEDOR INCORRECTO — con filtro de fecha
+// ============================================================
+
+async function cmdVendedorIncorrecto(chatId, consulta) {
+  const {fechaISO, fechaISOFin, fechaLabel, resto} = extraerFecha(consulta);
+  const terminos = splitTerminos(resto.trim());
+
+  if (terminos.length > 1) {
+    for (const t of terminos) {
+      await cmdVendedorIncorrecto(chatId, t + (fechaLabel ? ' ' + fechaLabel : ''));
+    }
+    return;
+  }
+
+  const termino = terminos[0] || '';
+  await enviar(chatId,'👤 Vendedores incorrectos'+(fechaLabel?' · <b>'+esc(fechaLabel)+'</b>':'')+(termino?' "'+esc(termino)+'"':'')+'...');
+  const datos=await csv(ID.VENTA_DIARIA,'Histórico Vendedor Incorrecto');
+  if (!datos){await enviar(chatId,'❌ Sin acceso.');return;}
+
+  let filas=datos.slice(1).filter(function(r){
+    const f = normalizarFecha(r[VEND_INC.FECHA]);
+    return f.length === 10 && f.match(/^\d{4}-\d{2}-\d{2}$/) && String(r[0]||'').trim();
+  });
+  if (fechaISO) filas=filas.filter(function(r){return coincideFecha(r[VEND_INC.FECHA], fechaISO, fechaISOFin);});
+  if (termino){
+    const tl=termino;
+    filas=filas.filter(function(r){return[VEND_INC.SKU,VEND_INC.CLIENTE,VEND_INC.VENDEDOR,VEND_INC.SO].some(function(i){return contiene(r[i], tl);});});
+  }
+
+  console.log('Vendedor incorrecto "'+consulta+'": '+filas.length);
+  if (!filas.length){await enviar(chatId,'😔 Sin registros'+(fechaLabel||termino?' para los filtros indicados':'')+'.');return;}
+
+  filas.sort(function(a,b){ return normalizarFecha(b[VEND_INC.FECHA]).localeCompare(normalizarFecha(a[VEND_INC.FECHA])); });
+  const top=filas.slice(0,MAX_RES);
+  let tg='👤 <b>Vendedores Incorrectos</b>'+(fechaLabel?' · '+fechaLabel:'')+(termino?' · '+esc(termino):'')+'\n'+filas.length+' registros\n━━━━━━━━━━━━━━━━━\n\n';
+  let wa='VENDEDORES INCORRECTOS\n'+filas.length+' registros\n\n';
+
+  top.forEach(function(r,i){
+    const fecha=normalizarFecha(r[VEND_INC.FECHA]);
+    const prod=String(r[VEND_INC.PRODUCTO]||'-').replace(/^\[.+?\]\s*/,'');
+    tg+=(i+1)+'. <b>'+esc(r[VEND_INC.SKU]||'-')+'</b>\n'+
+        '   📅 '+esc(fecha)+' | SO: '+esc(r[VEND_INC.SO]||'-')+'\n'+
+        '   👤 Cliente: '+esc(r[VEND_INC.CLIENTE]||'-')+'\n'+
+        '   ⚠️ Vendedor: <b>'+esc(r[VEND_INC.VENDEDOR]||'-')+'</b>\n'+
+        '   '+esc(prod.substring(0,50))+(prod.length>50?'...':'')+'\n\n';
+    wa+=(i+1)+'. '+(r[VEND_INC.SKU]||'-')+' | '+(r[VEND_INC.CLIENTE]||'-')+' | '+(r[VEND_INC.VENDEDOR]||'-')+'\n';
+  });
+  if (filas.length>MAX_RES) tg+='...y '+(filas.length-MAX_RES)+' más.';
+  await enviar(chatId,tg);await wa_send(chatId,wa);
+}
+
+// ============================================================
+// SOBREVENTA
+// ============================================================
+
+async function cmdSobreventa(chatId, consulta) {
+  const {fechaISO, fechaISOFin, fechaLabel, resto} = extraerFecha(consulta);
+  const terminos = splitTerminos(resto.trim());
+
+  if (terminos.length > 1) {
+    for (const t of terminos) {
+      await cmdSobreventa(chatId, t + (fechaLabel ? ' ' + fechaLabel : ''));
+    }
+    return;
+  }
+
+  const termino = terminos[0] || '';
+  await enviar(chatId,'🚨 Sobreventa'+(fechaLabel?' · <b>'+esc(fechaLabel)+'</b>':'')+(termino?' "'+esc(termino)+'"':'')+'...');
+  const datos=await csv(ID.SOBREVENTA,'Sobreventa Actual');
+  if (!datos){await enviar(chatId,'❌ Sin acceso.');return;}
+  let filas=datos.filter(function(r){return String(r[SOBRE.REF]||'').match(/^[A-Z]/);});
+  if (fechaISO) filas=filas.filter(function(r){return coincideFecha(r[SOBRE.FECHA], fechaISO, fechaISOFin);});
+  if (termino){const tl=termino;filas=filas.filter(function(r){return[SOBRE.REF,SOBRE.CONTACTO,SOBRE.DOC,SOBRE.SKU,SOBRE.NOMBRE,SOBRE.ESTADO].some(function(i){return contiene(r[i], tl);});});}
+  if (!filas.length){await enviar(chatId,'😔 Sin sobreventas'+(fechaLabel||termino?' para los filtros indicados':'')+'.');return;}
+  filas.sort(function(a,b){ return normalizarFecha(b[SOBRE.FECHA]).localeCompare(normalizarFecha(a[SOBRE.FECHA])); });
+  const top=filas.slice(0,MAX_RES);
+
+  // Obtener IDs reales de Odoo para los pickings mostrados → links directos
+  const refsTop = [...new Set(top.map(function(r){ return String(r[SOBRE.REF]||'').trim(); }).filter(Boolean))];
+  const odooIds = await odooGetPickingIds(refsTop);
+
+  let tg='🚨 <b>Sobreventa</b>'+(fechaLabel?' · '+fechaLabel:'')+(termino?' · '+esc(termino):'')+'\n'+filas.length+' registros\n━━━━━━━━━━━━━━━━━\n\n';
+  let wa='SOBREVENTA'+(fechaLabel?' '+fechaLabel:'')+(termino?' - '+termino:'')+'\n'+filas.length+' registros\n\n';
+  top.forEach(function(r,i){
+    const dem=num(r[SOBRE.QTY_DEM]),real=num(r[SOBRE.QTY_REAL]),diff=real-dem;
+    const doc=String(r[SOBRE.DOC]||'').trim();
+    const sku=String(r[SOBRE.SKU]||'').trim();
+    const ref=String(r[SOBRE.REF]||'').trim();
+    // Link directo al picking en Odoo usando su ID real
+    const pid = odooIds[ref];
+    const refMostrar = pid ? '<a href="'+odooPickingLink(pid)+'">'+esc(ref||'-')+'</a>' : esc(ref||'-');
+    tg+=(i+1)+'. <b>'+esc(r[SOBRE.NOMBRE]||'-')+'</b>\n'+
+        (sku?'   🏷️ <code>'+esc(sku)+'</code>\n':'')+
+        '   📋 '+refMostrar+' | 👤 '+esc(r[SOBRE.CONTACTO]||'-')+'\n'+
+        (doc?'   🗂️ Doc. origen: <code>'+esc(doc)+'</code>\n':'')+
+        '   📦 Dem: '+dem+' | Real: '+real+(diff!==0?' | <b>Diff: '+diff+'</b>':'')+'\n'+
+        '   '+esc(r[SOBRE.ESTADO]||'-')+'\n\n';
+    wa+=(i+1)+'. '+(r[SOBRE.NOMBRE]||'-')+' | '+(r[SOBRE.CONTACTO]||'-')+' | Dem:'+dem+' Real:'+real+'\n';
+  });
+  if (filas.length>MAX_RES) tg+='...y '+(filas.length-MAX_RES)+' más.';
+  await enviar(chatId,tg);await wa_send(chatId,wa);
+}
+
+// ============================================================
+// POR RECIBIR
+// ============================================================
+
+async function cmdPorRecibir(chatId, consulta) {
+  const {fechaISO, fechaISOFin, fechaLabel, resto} = extraerFecha(consulta);
+  const terminos = splitTerminos(resto.trim());
+
+  if (terminos.length > 1) {
+    for (const t of terminos) {
+      await cmdPorRecibir(chatId, t + (fechaLabel ? ' ' + fechaLabel : ''));
+    }
+    return;
+  }
+
+  const termino = terminos[0] || '';
+  await enviar(chatId,'📥 Por recibir'+(fechaLabel?' · <b>'+esc(fechaLabel)+'</b>':'')+(termino?' "'+esc(termino)+'"':'')+'...');
+  const datos=await csv(ID.POR_RECIBIR,'Por Recibir Actual');
+  if (!datos){await enviar(chatId,'❌ Sin acceso.');return;}
+  let filas=datos.filter(function(r){return String(r[RECIBIR.REF]||'').match(/^[A-Z]/);});
+  if (fechaISO) filas=filas.filter(function(r){return coincideFecha(r[RECIBIR.FECHA], fechaISO, fechaISOFin);});
+  if (termino){const tl=termino;filas=filas.filter(function(r){return[RECIBIR.REF,RECIBIR.PROVEEDOR,RECIBIR.DOC,RECIBIR.SKU,RECIBIR.NOMBRE].some(function(i){return contiene(r[i], tl);});});}
+  if (!filas.length){await enviar(chatId,'😔 Sin registros por recibir'+(fechaLabel||termino?' para los filtros indicados':'')+'.');return;}
+  let esp=0,rec=0;filas.forEach(function(r){esp+=num(r[RECIBIR.QTY_ESP]);rec+=num(r[RECIBIR.QTY_REC]);});
+  filas.sort(function(a,b){ return normalizarFecha(b[RECIBIR.FECHA]).localeCompare(normalizarFecha(a[RECIBIR.FECHA])); });
+  const top=filas.slice(0,MAX_RES);
+  let tg='📥 <b>Por Recibir</b>'+(fechaLabel?' · '+fechaLabel:'')+(termino?' · '+esc(termino):'')+'\n'+filas.length+' | Esp: <b>'+esp.toLocaleString()+'</b> | Rec: <b>'+rec.toLocaleString()+'</b>\n━━━━━━━━━━━━━━━━━\n\n';
+  let wa='POR RECIBIR'+(fechaLabel?' '+fechaLabel:'')+(termino?' - '+termino:'')+'\n'+filas.length+' | Esp:'+esp+' Rec:'+rec+'\n\n';
+  top.forEach(function(r,i){
+    const e=num(r[RECIBIR.QTY_ESP]),rc=num(r[RECIBIR.QTY_REC]),p=e-rc;
+    tg+=(i+1)+'. <b>'+esc(r[RECIBIR.NOMBRE]||'-')+'</b>\n'+
+        '   📋 '+esc(r[RECIBIR.REF]||'-')+' | 🏭 '+esc(r[RECIBIR.PROVEEDOR]||'-')+'\n'+
+        '   📄 '+esc(r[RECIBIR.DOC]||'-')+' · '+esc(r[RECIBIR.ESTADO]||'-')+'\n'+
+        '   📦 Esp:'+e+' | Rec:'+rc+(p>0?' | <b>Pend:'+p+'</b>':'')+'\n\n';
+    wa+=(i+1)+'. '+(r[RECIBIR.NOMBRE]||'-')+' | Prov:'+(r[RECIBIR.PROVEEDOR]||'-')+' | Pend:'+p+'\n';
+  });
+  if (filas.length>MAX_RES) tg+='...y '+(filas.length-MAX_RES)+' más.';
+  await enviar(chatId,tg);await wa_send(chatId,wa);
+}
+
+// ============================================================
+// GYM — visitas al gimnasio por empleado y mes
+// ============================================================
+
+async function cmdGym(chatId, termino) {
+  await enviar(chatId, '🏋️ GYM'+(termino?' · "'+esc(termino)+'"':'')+'...');
+
+  const datos = await csv(ID.CHECADOR, 'GYM');
+  if (!datos || datos.length < 2) {
+    await enviar(chatId, '❌ Sin acceso a la hoja GYM.'); return;
+  }
+
+  // Headers dinámicos: ID[0], Empleado[1], Día[2], luego meses (may 2026, jun 2026, ...)
+  // Detectar la fila de headers (primera con "ID" o "Empleado")
+  let hIdx = 0;
+  for (let i = 0; i < Math.min(datos.length, 3); i++) {
+    const c0 = sinAcentos(String(datos[i][0]||'').toLowerCase());
+    const c1 = sinAcentos(String(datos[i][1]||'').toLowerCase());
+    if (c0 === 'id' || c1 === 'empleado' || c1 === 'nombre') { hIdx = i; break; }
+  }
+
+  const headers = datos[hIdx];
+  // Las columnas de meses son de la 3 (índice 3) en adelante
+  const colsMeses = [];
+  for (let c = 3; c < headers.length; c++) {
+    const nom = String(headers[c]||'').trim();
+    if (nom) colsMeses.push({ idx: c, nombre: nom });
+  }
+
+  const filas = datos.slice(hIdx+1).filter(function(r) {
+    return String(r[0]||'').trim() && String(r[1]||'').trim();
+  });
+
+  let resultado = filas;
+  if (termino) {
+    resultado = filas.filter(function(r) {
+      const id = String(r[0]||'').trim();
+      const tl = sinAcentos(termino.toLowerCase().trim());
+      const tlNum = tl.replace(/^0+/, '') || tl;
+      return id === tl || id === tlNum || contieneNombre(r[1], termino);
+    });
+
+    // Desambiguar si matchea varios empleados distintos (por ID)
+    const empU = {};
+    resultado.forEach(function(r){
+      const id = String(r[0]||'').trim();
+      const nom = String(r[1]||'').trim();
+      if (id && nom) empU[id] = nom;
+    });
+    const idsU = Object.keys(empU);
+    if (idsU.length > 1) {
+      let tg = '👥 Hay <b>'+idsU.length+'</b> empleados que coinciden con "<b>'+esc(termino)+'</b>":\n━━━━━━━━━━━━━━━━━\n\n';
+      idsU.sort(function(a,b){ return empU[a].localeCompare(empU[b],'es'); });
+      idsU.forEach(function(id){ tg += '• <b>'+esc(empU[id])+'</b> (ID #'+esc(String(id).replace(/\.0$/,''))+')\n'; });
+      tg += '\n💡 Sé más específico con el nombre completo.';
+      await enviar(chatId, tg);
+      return;
+    }
+  }
+
+  if (!resultado.length) {
+    await enviar(chatId, '😔 Sin datos de GYM'+(termino?' para "'+esc(termino)+'"':'')+'.');
+    return;
+  }
+
+  // Si busca un empleado específico → detalle completo de sus meses
+  if (termino && resultado.length <= 3) {
+    let tg = '🏋️ <b>Registro de Gimnasio</b>\n━━━━━━━━━━━━━━━━━\n\n';
+    resultado.forEach(function(r) {
+      const nombre = String(r[1]||'-').trim();
+      const corte  = String(r[2]||'-').trim();
+      tg += '👤 <b>'+esc(nombre)+'</b> · ID #'+esc(String(r[0]||'-'))+'\n';
+      tg += '📅 Su corte es el día <b>'+esc(corte)+'</b> de cada mes\n';
+      tg += '\n<b>Veces que asistió al gym:</b>\n';
+      let totalVisitas = 0;
+      colsMeses.forEach(function(mc) {
+        const visitas = parseInt(String(r[mc.idx]||'0').replace(/[^0-9]/g,'')) || 0;
+        totalVisitas += visitas;
+        const icon = visitas >= 20 ? '🟢' : (visitas >= 1 ? '🟡' : '🔴');
+        tg += icon+' '+esc(mc.nombre)+': <b>'+visitas+'</b> '+(visitas===1?'vez':'veces')+'\n';
+      });
+      tg += '\n📊 Total acumulado: <b>'+totalVisitas+'</b> visitas al gym\n\n';
+    });
+    await enviar(chatId, tg);
+    return;
+  }
+
+  // Listado general → mostrar el MES ACTUAL (sin calcular nada raro)
+  // Buscar la columna del mes en curso (ej. "may 2026") por nombre
+  const mesesAbr = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  const now = new Date();
+  const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+  const mx  = new Date(utc + (-6 * 60 * 60000));
+  const mesActualAbr = mesesAbr[mx.getMonth()];
+  const anioActual = mx.getFullYear().toString();
+
+  // Buscar columna que coincida con el mes actual
+  let ultimoMes = null;
+  colsMeses.forEach(function(mc) {
+    const nomNorm = sinAcentos(mc.nombre.toLowerCase());
+    if (nomNorm.indexOf(mesActualAbr) !== -1 && mc.nombre.indexOf(anioActual) !== -1) {
+      ultimoMes = mc;
+    }
+  });
+  // Si no encuentra el mes actual, usar la última columna disponible
+  if (!ultimoMes) ultimoMes = colsMeses[colsMeses.length-1];
+
+  resultado.sort(function(a,b){
+    const va = parseInt(String(a[ultimoMes.idx]||'0').replace(/[^0-9]/g,''))||0;
+    const vb = parseInt(String(b[ultimoMes.idx]||'0').replace(/[^0-9]/g,''))||0;
+    return vb - va;
+  });
+
+  const top = resultado.slice(0, MAX_RES);
+  let tg = '🏋️ <b>Registro de Gimnasio</b> · '+esc(ultimoMes.nombre)+'\n'+
+           resultado.length+' empleados\n━━━━━━━━━━━━━━━━━\n\n';
+
+  top.forEach(function(r, i) {
+    const nombre  = String(r[1]||'-').trim();
+    const corte   = parseInt(String(r[2]||'0').replace(/[^0-9]/g,'')) || 0;
+    const visitas = parseInt(String(r[ultimoMes.idx]||'0').replace(/[^0-9]/g,'')) || 0;
+    const icon = visitas >= 20 ? '🟢' : (visitas >= 1 ? '🟡' : '🔴');
+    tg += (i+1)+'. '+icon+' <b>'+esc(nombre)+'</b> — '+visitas+' '+(visitas===1?'vez':'veces')+' (corte día '+corte+')\n';
+  });
+
+  if (resultado.length > MAX_RES) tg += '\n...y '+(resultado.length-MAX_RES)+' más.';
+  tg += '\n\n💡 Escribe <code>gym [nombre]</code> para ver el detalle de un empleado.';
+
+  await enviar(chatId, tg);
+}
+
+// ============================================================
+// CHECK CHOFERES — checadas del día por empleado
+// ============================================================
+
+async function cmdCheck(chatId, consulta) {
+  const parsed = extraerFecha(consulta || 'hoy');
+  // Si no detectó fecha, asumir hoy
+  const now = new Date();
+  const utc = now.getTime() + (now.getTimezoneOffset()*60000);
+  const mx  = new Date(utc + (-6*60*60000));
+  const hoyISO = mx.getFullYear()+'-'+String(mx.getMonth()+1).padStart(2,'0')+'-'+String(mx.getDate()).padStart(2,'0');
+  
+  const fechaISO = parsed.fechaISO || hoyISO;
+  const fechaD   = parsed.fechaLabel || fechaISO;
+  const termino  = parsed.resto.trim();
+
+  await enviar(chatId, '🚛 Check choferes · <b>'+esc(fechaD)+'</b>'+(termino?' · "'+esc(termino)+'"':'')+'...');
+
+  // Usar export directo por gid (más confiable que gviz para hojas con datos recientes)
+  const GID_CHOFERES = '1265720619';
+  let datos = null;
+  try {
+    const url = 'https://docs.google.com/spreadsheets/d/'+ID.CHECADOR+'/export?format=csv&gid='+GID_CHOFERES+'&_='+Date.now();
+    const r = await fetch(url, {
+      signal: AbortSignal.timeout(15000),
+      cf: { cacheTtl: 0, cacheEverything: false },
+      headers: { 'Cache-Control': 'no-cache' }
+    });
+    if (r.ok) {
+      const text = await r.text();
+      datos = text.split('\n').map(function(line){
+        const cols=[]; let inQ=false,cur='';
+        for(let i=0;i<line.length;i++){
+          const c=line[i];
+          if(c==='"'){if(inQ&&line[i+1]==='"'){cur+='"';i++;}else inQ=!inQ;}
+          else if(c===','&&!inQ){cols.push(cur.trim());cur='';}
+          else cur+=c;
+        }
+        cols.push(cur.trim());
+        return cols;
+      }).filter(function(r){return r.length>1;});
+    }
+  } catch(e) { console.error('check fetch:', e.message); }
+
+  if (!datos || datos.length < 2) {
+    await enviar(chatId, '❌ Sin acceso a CHECADOR_CHOFERES.'); return;
+  }
+
+  // gviz omite la fila de título/headers — datos empiezan desde fila 0
+  // A[0]=ID, B[1]=Nombre, C[2]=Fecha(2026-05-15), D[3]=Hora, J[9]=Link Maps, K[10]=Estado Zona
+  let startIdx = 0;
+  for (let i = 0; i < Math.min(datos.length, 5); i++) {
+    const id = String(datos[i][0]||'').trim();
+    if (id && !isNaN(parseFloat(id))) { startIdx = i; break; }
+  }
+
+  const filas = datos.slice(startIdx).filter(function(r) {
+    return String(r[0]||'').trim() && String(r[1]||'').trim();
+  });
+
+  // Filtrar por fecha
+  let resultado = filas.filter(function(r) {
+    const f = String(r[2]||'').trim().substring(0, 10);
+    return f === fechaISO;
+  });
+
+  // Filtrar por nombre o ID
+  if (termino) {
+    const tl = sinAcentos(termino.toLowerCase().trim());
+    const tlNum = tl.replace(/^0+/, '') || tl;
+    resultado = resultado.filter(function(r) {
+      const id = String(r[0]||'').trim();
+      // Coincidencia por ID exacto (con o sin ceros) o por nombre con palabra completa
+      return id === tl || id === tlNum || contieneNombre(r[1], termino);
+    });
+  }
+
+  if (!resultado.length) {
+    await enviar(chatId, '😔 Sin checadas'+(termino?' para "'+esc(termino)+'"':'')+' el <b>'+esc(fechaD)+'</b>.');
+    return;
+  }
+
+  // Agrupar por empleado
+  const porEmpleado = {};
+  resultado.forEach(function(r) {
+    const nombre = String(r[1]||'').trim();
+    if (!porEmpleado[nombre]) porEmpleado[nombre] = [];
+    porEmpleado[nombre].push({
+      hora: String(r[3]||'').trim(),
+      zona: String(r[10]||'').trim(),
+      link: String(r[9]||'').trim()
+    });
+  });
+
+  const empleados = Object.keys(porEmpleado).sort();
+  let tg = '🚛 <b>Check Choferes</b> · '+esc(fechaD)+'\n'+
+           empleados.length+' empleado(s) · '+resultado.length+' checada(s)\n'+
+           '━━━━━━━━━━━━━━━━━\n\n';
+
+  empleados.forEach(function(nombre, i) {
+    const checadas = porEmpleado[nombre];
+    tg += (i+1)+'. <b>'+esc(nombre)+'</b>\n';
+    checadas.forEach(function(c) {
+      const zonaIcon = c.zona === 'VÁLIDA' ? '✅' : (c.zona ? '⚠️' : '❓');
+      tg += '   🕐 <b>'+esc(c.hora)+'</b> '+zonaIcon+' '+esc(c.zona||'-');
+      if (c.link) tg += '\n   <a href="'+esc(c.link)+'">📍 Ver en Maps</a>';
+      tg += '\n';
+    });
+    tg += '\n';
+  });
+
+  if (resultado.length > MAX_RES) tg += '...y '+(resultado.length-MAX_RES)+' más.\n';
+
+  await enviar(chatId, tg);
+}
+
+// ============================================================
+// KILLERS WALMART
+// ============================================================
+
+async function cmdKillers(chatId, termino) {
+  await enviar(chatId, '🔪 Killers Walmart...');
+
+  const datos = await csv(ID.KILLERS, 'Activos');
+  if (!datos || datos.length < 2) {
+    await enviar(chatId, '❌ Sin acceso al Sheet de Killers.'); return;
+  }
+
+  // Col A[0]=SKU, B[1]=Detalles, C[2]=PRECIO, D[3]=Precio negociado, E[4]=Cupón
+  const filas = datos.slice(1).filter(function(r) {
+    return String(r[0]||'').trim();
+  });
+
+  let resultado = filas;
+
+  // Si hay término de búsqueda, filtrar por col A (SKU) o col B (Detalles)
+  if (termino) {
+    const tl = sinAcentos(termino.toLowerCase());
+    resultado = filas.filter(function(r) {
+      return sinAcentos(String(r[0]||'').toLowerCase()).indexOf(tl) !== -1 ||
+             sinAcentos(String(r[1]||'').toLowerCase()).indexOf(tl) !== -1;
+    });
+  }
+
+  if (!resultado.length) {
+    await enviar(chatId, '😔 Sin resultados'+(termino?' para "'+esc(termino)+'"':'')+' en Killers.');
+    return;
+  }
+
+  const top = resultado.slice(0, MAX_RES);
+  let tg = '🔪 <b>Killers Walmart</b>'+(termino?' · '+esc(termino):'')+'\n'+
+           resultado.length+' productos\n━━━━━━━━━━━━━━━━━\n\n';
+
+  top.forEach(function(r, i) {
+    const sku     = String(r[0]||'-').trim();
+    const precio  = String(r[2]||'-').trim();
+    const negoc   = String(r[3]||'-').trim();
+    const cupon   = String(r[4]||'-').trim();
+    // Extraer nombre del artículo desde col B (viene larga, tomar hasta " SKU :")
+    const detalle = String(r[1]||'').trim();
+    const nombre  = detalle.split(' SKU :')[0].trim() || detalle.substring(0, 60);
+
+    tg += (i+1)+'. <b>'+esc(nombre)+'</b>\n'+
+          '   🏷️ <code>'+esc(sku)+'</code>\n'+
+          '   💰 Precio: <b>'+esc(precio)+'</b> · Negociado: <b>'+esc(negoc)+'</b>\n'+
+          '   🎟️ Cupón: <b>'+esc(cupon)+'</b>\n\n';
+  });
+
+  if (resultado.length > MAX_RES) tg += '...y '+(resultado.length-MAX_RES)+' más.\n';
+
+  await enviar(chatId, tg);
+}
+
+// ============================================================
+// RETARDOS POR QUINCENA — empleados que perdieron bono por retraso
+// ============================================================
+
+async function cmdRetardosBono(chatId) {
+  await enviar(chatId, '⏰ Calculando retardos por quincena...');
+
+  const [datosMetr, datosTurnos] = await Promise.all([
+    csv(ID.CHECADOR, 'METRICAS_DIARIAS'),
+    csv(ID.CHECADOR, 'TURNOS_DEFAULT')
+  ]);
+
+  if (!datosMetr || !datosTurnos) {
+    await enviar(chatId, '❌ Sin acceso al checador.'); return;
+  }
+
+  // 1. Empleados elegibles para bono (los que tienen "Si" en BONO PUNTUALIDAD)
+  const elegibles = new Set();
+  datosTurnos.slice(1).forEach(function(r) {
+    const nombre = String(r[1]||'').trim();
+    const bono   = sinAcentos(String(r[7]||'').trim());
+    if (nombre && bono === 'si') elegibles.add(nombre);
+  });
+
+  // 2. Recolectar retardos por empleado y quincena
+  // Solo cuenta los que descalifican el bono: SIN BONO (18-30 min) o RETARDO (31+ min)
+  const emps = {}; // nombre -> { Q1: [...], Q2: [...] }
+
+  datosMetr.slice(1).forEach(function(r) {
+    const nombre = String(r[CH_MET.NOMBRE]||'').trim();
+    if (!nombre || !elegibles.has(nombre)) return;
+
+    const estatus = sinAcentos(String(r[CH_MET.ESTATUS]||'').trim());
+    if (estatus !== 'sin bono' && estatus !== 'retardo') return;
+
+    const fechaISO = normalizarFecha(r[CH_MET.FECHA]);
+    if (!fechaISO) return;
+    const diaMes = parseInt(fechaISO.split('-')[2], 10);
+    const q = diaMes <= 15 ? 'Q1' : 'Q2';
+
+    const minRet  = parseFloat(String(r[CH_MET.MIN_RETARDO]||'0')) || 0;
+    const horaM   = r[CH_MET.ENTRADA] ? String(r[CH_MET.ENTRADA]).match(/(\d{1,2}:\d{2})/) : null;
+    const hora    = horaM ? horaM[1] : '--';
+
+    if (!emps[nombre]) emps[nombre] = { Q1:[], Q2:[] };
+    emps[nombre][q].push({
+      fechaISO: fechaISO,
+      hora: hora,
+      minRet: minRet,
+      estatus: estatus
+    });
+  });
+
+  // 3. Render por quincena
+  function renderQ(label, q) {
+    const empsConRet = Object.keys(emps).filter(function(n){ return emps[n][q].length > 0; });
+    if (empsConRet.length === 0) {
+      return '📆 <b>'+label+'</b>\n✅ Sin retardos · todos cumplieron\n';
+    }
+    empsConRet.sort(function(a,b){ return a.localeCompare(b,'es'); });
+    let txt = '📆 <b>'+label+'</b>\n';
+    txt += '⏰ <b>'+empsConRet.length+' empleados con retardo</b>\n\n';
+    empsConRet.forEach(function(nombre) {
+      const regs = emps[nombre][q].sort(function(a,b){ return a.fechaISO.localeCompare(b.fechaISO); });
+      txt += '• <b>'+esc(nombre)+'</b> ('+regs.length+')\n';
+      regs.forEach(function(d) {
+        const fDisp = isoADisplay(d.fechaISO);
+        const icon = d.estatus === 'retardo' ? '🔴' : '🟠';
+        txt += '    '+icon+' '+esc(fDisp)+' · entrada '+esc(d.hora)+' ('+d.minRet+' min)\n';
+      });
+    });
+    return txt;
+  }
+
+  let tg = '⏰ <b>Retardos por Quincena</b>\n';
+  tg += '<i>Empleados que perdieron bono por retraso</i>\n';
+  tg += '<i>🟠 SIN BONO (18-30 min) · 🔴 RETARDO (31+ min)</i>\n━━━━━━━━━━━━━━━━━\n\n';
+  tg += '🗓️ QUINCENA 1 (1-15)\n';
+  tg += renderQ('Q1', 'Q1');
+  tg += '\n━━━━━━━━━━━━━━━━━\n\n';
+  tg += '🗓️ QUINCENA 2 (16-fin)\n';
+  tg += renderQ('Q2', 'Q2');
+
+  await enviar(chatId, tg);
+}
+
+// ============================================================
+// BONO DE PUNTUALIDAD
+// ============================================================
+
+async function cmdBonoPuntualidad(chatId) {
+  await enviar(chatId, '🏆 Calculando bono de puntualidad...');
+
+  const [datosMetr, datosTurnos] = await Promise.all([
+    csv(ID.CHECADOR, 'METRICAS_DIARIAS'),
+    csv(ID.CHECADOR, 'TURNOS_DEFAULT')
+  ]);
+
+  if (!datosMetr || !datosTurnos) {
+    await enviar(chatId, '❌ Sin acceso al checador.'); return;
+  }
+
+  // ── 1. Empleados elegibles ───────────────────────────────────
+  const elegibles = {};
+  datosTurnos.slice(1).forEach(function(r) {
+    const nombre = String(r[1]||'').trim();
+    const bono   = sinAcentos(String(r[7]||'').trim().toLowerCase());
+    const turno  = String(r[2]||'').trim();
+    if (nombre && bono === 'si') elegibles[nombre] = turno;
+  });
+
+  // ── 2. (Las vacaciones ya NO afectan el bono) ───────────────
+
+  // ── 5. Procesar METRICAS_DIARIAS por quincena ───────────────
+  // CAMBIO CLAVE (alineado con Code.gs): usar la columna Estatus[7] que ya
+  // viene calculada por procesarAsistenciasCompleto. Eso respeta automáticamente
+  // a los choferes con excepción de retardo (turno T3 Choferes o IDs en la
+  // hoja EVENTUALIDADES → Excepciones de Retardos), porque en la métrica diaria
+  // se marcan como PUNTUAL con 0 min sin importar la hora de checada.
+  //
+  // Estatus en METRICAS_DIARIAS:
+  //   PUNTUAL    → 0-15 min retraso (o excepción de retardo) → suma al bono
+  //   TOLERANCIA → 16-17 min retraso → va a tolerancia (no descalifica)
+  //   SIN BONO   → 18-30 min retraso → descalifica el bono
+  //   RETARDO    → 31+ min retraso → descalifica el bono
+  //   FALTA      → no checó → descalifica si es día laboral
+  const emps = {};
+  function bonoEsSi(val) {
+    const v = sinAcentos(String(val||'').trim().toLowerCase());
+    return v === 'si' || v === 'true' || v === '1';
+  }
+
+  datosMetr.slice(1).forEach(function(r) {
+    const nombre = String(r[CH_MET.NOMBRE]||'').trim();
+    if (!nombre || !elegibles[nombre]) return;
+    if (bonoEsSi(r[29])) return; // día inhábil
+
+    // Determinar quincena por el día del mes
+    const fechaISO = normalizarFecha(r[CH_MET.FECHA]);
+    if (!fechaISO) return;
+    const diaMes = parseInt(fechaISO.split('-')[2], 10);
+    const q = diaMes <= 15 ? 'Q1' : 'Q2';
+
+    if (!emps[nombre]) emps[nombre] = {
+      Q1: { dias:0, ret16_17:0, ret18:false, falta:false, tolDias:[] },
+      Q2: { dias:0, ret16_17:0, ret18:false, falta:false, tolDias:[] }
+    };
+    const e = emps[nombre][q];
+
+    // Vacaciones o enfermedad: día no laboral, se ignora (no cuenta ni a favor ni en contra)
+    if (bonoEsSi(r[CH_MET.ES_VAC]) || bonoEsSi(r[CH_MET.ES_ENF])) return;
+
+    // Falta (no checó en día laboral) → descalifica esa quincena
+    if (bonoEsSi(r[CH_MET.ES_FALTA])) { e.falta = true; return; }
+
+    // Día efectivamente laborado
+    e.dias++;
+
+    // ✨ Lógica alineada con Code.gs (lee el Estatus ya calculado):
+    //   PUNTUAL    → 0-15 min retraso (o excepción de retardo) → suma al bono
+    //   TOLERANCIA → 16-17 min retraso → tolerancia (no descalifica)
+    //   SIN BONO   → 18-30 min retraso → descalifica
+    //   RETARDO    → 31+ min retraso → descalifica
+    // sinAcentos() devuelve en minúsculas, así que comparamos en minúsculas
+    const estatus = sinAcentos(String(r[CH_MET.ESTATUS]||'').trim());
+
+    if (estatus === 'sin bono' || estatus === 'retardo') {
+      e.ret18 = true;
+    } else if (estatus === 'tolerancia') {
+      e.ret16_17++;
+      const hora = r[CH_MET.ENTRADA] ? String(r[CH_MET.ENTRADA]).match(/(\d{1,2}:\d{2})/) : null;
+      e.tolDias.push(isoADisplay(fechaISO) + (hora ? ' '+hora[1] : ''));
+    }
+    // 'puntual' o cualquier otro → no hace nada (queda como día trabajado limpio)
+  });
+
+  // ── 6. Clasificar por quincena ──────────────────────────────
+  const resultado = {
+    Q1: { bono: [], tol: [] },
+    Q2: { bono: [], tol: [] }
+  };
+
+  Object.keys(emps).forEach(function(nombre) {
+    ['Q1','Q2'].forEach(function(q) {
+      const e = emps[nombre][q];
+      // Si no trabajó ningún día en esa quincena, no aparece
+      if (e.dias === 0) return;
+      // Excluido SOLO por: retardo ≥18 o falta en esa quincena
+      // Las vacaciones YA NO descalifican el bono
+      if (e.ret18 || e.falta) return;
+      if (e.ret16_17 === 0) {
+        resultado[q].bono.push({ nombre: nombre, dias: e.dias });
+      } else {
+        resultado[q].tol.push({ nombre: nombre, inc: e.ret16_17, dias: e.dias, tolDias: e.tolDias });
+      }
+    });
+  });
+
+  ['Q1','Q2'].forEach(function(q) {
+    resultado[q].bono.sort(function(a,b){ return a.nombre.localeCompare(b.nombre,'es'); });
+    resultado[q].tol.sort(function(a,b){ return a.nombre.localeCompare(b.nombre,'es'); });
+  });
+
+  // ── 7. Mensaje ──────────────────────────────────────────────
+  function renderQuincena(label, q) {
+    let txt = '📆 <b>'+label+'</b>\n';
+    txt += '✅ <b>BONO PERFECTO ('+q.bono.length+')</b>\n';
+    if (q.bono.length) {
+      q.bono.forEach(function(e){ txt += '• '+esc(e.nombre)+' ('+e.dias+' días)\n'; });
+    } else { txt += '— ninguno —\n'; }
+    txt += '\n⚠️ <b>TOLERANCIA ('+q.tol.length+')</b>\n';
+    if (q.tol.length) {
+      q.tol.forEach(function(e){
+        txt += '• '+esc(e.nombre)+' ('+e.inc+'/'+e.dias+')\n';
+        if (e.tolDias && e.tolDias.length) {
+          e.tolDias.forEach(function(d){ txt += '   📅 '+esc(d)+'\n'; });
+        }
+      });
+    } else { txt += '— ninguno —\n'; }
+    return txt;
+  }
+
+  let tg = '🏆 <b>Bono de Puntualidad</b>\n━━━━━━━━━━━━━━━━━\n\n';
+  tg += renderQuincena('QUINCENA 1 (1-15)', resultado.Q1);
+  tg += '\n━━━━━━━━━━━━━━━━━\n';
+  tg += renderQuincena('QUINCENA 2 (16-fin)', resultado.Q2);
+  await enviar(chatId, tg);
+}
+
+
+// ============================================================
+// CHECADOR — REPORTE GENERAL DE ASISTENCIA
+// ============================================================
+
+async function cmdReporteAsistencia(chatId, consulta) {
+  const {fechaISO, fechaLabel} = extraerFecha(consulta || 'hoy');
+  const fechaD = fechaLabel || consulta;
+
+  await enviar(chatId, '📋 Reporte de asistencia · <b>'+esc(fechaD)+'</b>...');
+
+  const [datosMetricas, datosEventualidades, datosTurnos] = await Promise.all([
+    csv(ID.CHECADOR, 'METRICAS_DIARIAS'),
+    csv(ID.CHECADOR, 'EVENTUALIDADES'),
+    csv(ID.CHECADOR, 'TURNOS_DEFAULT')
+  ]);
+
+  if (!datosMetricas) { await enviar(chatId, '❌ Sin acceso al checador.'); return; }
+
+  const CH = { ID:0, NOMBRE:1, FECHA:2, TURNO:3, ENTRADA:5, ESTATUS:7,
+               MIN_RET:8, SALIDA:21, HORAS:23, ES_RET:25, ES_FALTA:26,
+               ES_VAC:27, ES_ENF:28, ES_INHAB:29, OBS:30 };
+
+  // Mapa nombre → departamento desde TURNOS_DEFAULT
+  // TURNOS_DEFAULT: Admin[0], Empleado[1], Turno[2], TURNO[3], DEPARTAMENTO[4]
+  const deptoPorNombre = {};
+  if (datosTurnos) {
+    datosTurnos.slice(1).forEach(function(r) {
+      const nombre = String(r[1]||'').trim();
+      const depto  = String(r[4]||'').trim() || 'SIN DEPTO';
+      if (nombre) deptoPorNombre[nombre] = depto;
+    });
+  }
+
+  // Agrupa lista de nombres por departamento y renderiza
+  function porDepto(lista) {
+    const grupos = {};
+    lista.forEach(function(nombre) {
+      const d = deptoPorNombre[nombre] || 'SIN DEPTO';
+      if (!grupos[d]) grupos[d] = [];
+      grupos[d].push(nombre);
+    });
+    let txt = '';
+    Object.keys(grupos).sort().forEach(function(d) {
+      txt += '  <i>'+esc(d)+'</i>\n';
+      grupos[d].forEach(function(n){ txt += '  • '+esc(n)+'\n'; });
+    });
+    return txt;
+  }
+
+  const filasDia = datosMetricas.slice(1).filter(function(r) {
+    const id = String(r[CH.ID]||'').trim();
+    if (!id || isNaN(parseFloat(id))) return false;
+    return coincideFecha(r[CH.FECHA], fechaISO, null);
+  });
+
+  if (!filasDia.length) {
+    await enviar(chatId, '😔 Sin registros de asistencia para <b>'+esc(fechaD)+'</b>.');
+    return;
+  }
+
+  const asistieron = [], retardos = [], ausentes = [], vacaciones = [], enfermos = [];
+
+  filasDia.forEach(function(r) {
+    const nombre  = extractName(r[CH.NOMBRE]);
+    const esRet   = sinAcentos(String(r[CH.ES_RET]||'').toLowerCase());
+    const esFalta = sinAcentos(String(r[CH.ES_FALTA]||'').toLowerCase());
+    const esVac   = sinAcentos(String(r[CH.ES_VAC]||'').toLowerCase());
+    const esEnf   = sinAcentos(String(r[CH.ES_ENF]||'').toLowerCase());
+    const esInhab = sinAcentos(String(r[CH.ES_INHAB]||'').toLowerCase());
+    const estatus = sinAcentos(String(r[CH.ESTATUS]||'').toLowerCase());
+    // SÍ con acento se normaliza a 'si'
+    function esToBool(v){ return v==='si'||v==='true'||v==='1'; }
+
+    // Prioridad: vacaciones > enfermedad > falta > inhábil > retardo > puntual
+    // IMPORTANTE: retardo se determina SOLO por la columna "Es Retardo",
+    // nunca por minRet > 0 (los SIN BONO tienen minRet alto pero NO son retardo)
+    if (esToBool(esVac) || estatus==='vacaciones') {
+      vacaciones.push(nombre);
+    } else if (esToBool(esEnf) || estatus==='enfermedad') {
+      enfermos.push(nombre);
+    } else if (esToBool(esFalta) || estatus==='falta') {
+      ausentes.push(nombre);
+    } else if (esToBool(esInhab) || estatus==='inhabil') {
+      // Día inhábil — no cuenta como asistencia ni como falta
+    } else if (esToBool(esRet)) {
+      retardos.push(nombre);
+      asistieron.push(nombre);
+    } else {
+      asistieron.push(nombre);
+    }
+  });
+
+  if (datosEventualidades) {
+    datosEventualidades.filter(function(r) {
+      return r[0] && !isNaN(parseFloat(String(r[0]))) && String(r[1]||'').trim();
+    }).forEach(function(r) {
+      const ini = normalizarFecha(r[2]);
+      const fin = normalizarFecha(r[3]);
+      if (ini && fin && ini <= fechaISO && fin >= fechaISO) {
+        const nombre = extractName(r[1]);
+        if (!vacaciones.includes(nombre)) vacaciones.push(nombre);
+      }
+    });
+  }
+
+  const totalEmpleados = datosTurnos
+    ? datosTurnos.slice(1).filter(function(r){ return String(r[0]||'').trim() && !isNaN(parseFloat(String(r[0]||''))); }).length
+    : filasDia.length;
+
+  const totalPresentes = asistieron.length;
+  const pct = totalEmpleados > 0 ? ((totalPresentes / totalEmpleados)*100).toFixed(1) : '0';
+
+  let tg = '📋 <b>REPORTE DE ASISTENCIA</b>\n'+
+           '📅 '+esc(fechaD)+'\n'+
+           '━━━━━━━━━━━━━━━━━\n'+
+           '👥 Total empleados: <b>'+totalEmpleados+'</b>\n'+
+           '✅ Asistieron: <b>'+totalPresentes+' ('+pct+'%)</b>\n'+
+           '⏰ Retardos: <b>'+retardos.length+'</b>\n'+
+           '❌ Ausentes: <b>'+ausentes.length+'</b>\n'+
+           '🏖️ Vacaciones: <b>'+vacaciones.length+'</b>\n'+
+           '🏥 Enfermos: <b>'+enfermos.length+'</b>\n';
+
+  if (ausentes.length)   { tg += '\n❌ <b>AUSENTES ('+ausentes.length+'):</b>\n'+porDepto(ausentes); }
+  if (retardos.length)   { tg += '\n⏰ <b>RETARDOS ('+retardos.length+'):</b>\n'+porDepto(retardos); }
+  if (vacaciones.length) { tg += '\n🏖️ <b>VACACIONES ('+vacaciones.length+'):</b>\n'+porDepto(vacaciones); }
+  if (enfermos.length)   { tg += '\n🏥 <b>ENFERMOS ('+enfermos.length+'):</b>\n'+porDepto(enfermos); }
+  await enviar(chatId, tg);
+}
+
+// ============================================================
+// CHECADOR — ESTATUS DEL DÍA (faltas, retardos, puntual...)
+// ============================================================
+
+async function cmdChEstatus(chatId, estatus, consulta) {
+  const {fechaISO, fechaISOFin, fechaLabel, resto} = extraerFecha(consulta);
+  const terminos = splitTerminos(resto.trim());
+
+  if (terminos.length > 1) {
+    for (const t of terminos) {
+      await cmdChEstatus(chatId, estatus, t + (fechaLabel ? ' ' + fechaLabel : ''));
+    }
+    return;
+  }
+
+  const termino = terminos[0] || '';
+
+  // Normalizar estatus a lo que aparece en la hoja
+  const estatusMap = {
+    'falta': 'FALTA', 'faltas': 'FALTA',
+    'retardo': 'RETARDO', 'retardos': 'RETARDO',
+    'puntual': 'PUNTUAL', 'puntuales': 'PUNTUAL',
+    'vacaciones': 'VACACIONES', 'vacacion': 'VACACIONES',
+    'enfermedad': 'ENFERMEDAD', 'enfermedades': 'ENFERMEDAD'
+  };
+  const estatusBuscar = estatusMap[estatus.toLowerCase()] || estatus.toUpperCase();
+  const estatusIcon = estatusBuscar==='FALTA'?'❌':estatusBuscar==='RETARDO'?'⏰':estatusBuscar==='PUNTUAL'?'✅':estatusBuscar==='VACACIONES'?'🏖️':'🏥';
+
+  await enviar(chatId, estatusIcon+' Checador: <b>'+esc(estatusBuscar)+'</b>'+(fechaLabel?' · <b>'+esc(fechaLabel)+'</b>':'')+(termino?' "'+esc(termino)+'"':'')+'...');
+
+  const datos = await csv(ID.CHECADOR, 'METRICAS_DIARIAS');
+  if (!datos) { await enviar(chatId,'❌ Sin acceso al checador.'); return; }
+
+  let filas = datos.slice(1).filter(function(r) {
+    return String(r[CH_MET.NOMBRE]||'').trim() !== '';
+  });
+
+  // Filtrar por estatus
+  filas = filas.filter(function(r) {
+    const est = String(r[CH_MET.ESTATUS]||'').toUpperCase();
+    return est.indexOf(estatusBuscar) !== -1;
+  });
+
+  // Filtrar por fecha
+  if (fechaISO) filas = filas.filter(function(r){ return coincideFecha(r[CH_MET.FECHA], fechaISO, fechaISOFin); });
+
+  // Filtrar por nombre
+  if (termino) {
+    const tl = termino;
+    filas = filas.filter(function(r){ return contieneNombre(r[CH_MET.NOMBRE], tl); });
+  }
+
+  console.log('Checador '+estatusBuscar+' "'+consulta+'": '+filas.length);
+  if (!filas.length) { await enviar(chatId,'😔 Sin registros de <b>'+esc(estatusBuscar)+'</b>'+(fechaLabel?' para el '+fechaLabel:'')+'.');return; }
+
+  const top = filas.slice(0, MAX_RES);
+  let tg = estatusIcon+' <b>'+esc(estatusBuscar)+'</b>'+(fechaLabel?' · '+fechaLabel:'')+(termino?' · '+esc(termino):'')+'\n'+filas.length+' registros\n━━━━━━━━━━━━━━━━━\n\n';
+  let wa = estatusBuscar+(fechaLabel?' '+fechaLabel:'')+(termino?' - '+termino:'')+'\n'+filas.length+' registros\n\n';
+
+  top.forEach(function(r,i) {
+    const fecha  = normalizarFecha(r[CH_MET.FECHA]);
+    const entrada = String(r[CH_MET.ENTRADA]||'--');
+    const horas   = parseFloat(String(r[CH_MET.HORAS]||'0'))||0;
+    const retardo = parseFloat(String(r[CH_MET.MIN_RETARDO]||'0'))||0;
+    tg += (i+1)+'. <b>'+esc(String(r[CH_MET.NOMBRE]||'-'))+'</b>\n'+
+          '   📅 '+esc(fecha)+' | Turno: '+esc(String(r[CH_MET.TURNO]||'-'))+'\n';
+    if (entrada!=='--'&&entrada!=='') tg += '   ▶️ Entrada: '+esc(entrada)+(retardo>0?' (+'+retardo+' min)':'')+'\n';
+    if (horas>0) tg += '   ⏱️ Horas: '+horas.toFixed(2)+'\n';
+    if (r[CH_MET.OBS]) {
+      // Limpiar el texto de OBS: quitar el estado al final (| ❌ Falt, | ✅ ..., etc.)
+      const obs = String(r[CH_MET.OBS]).replace(/\s*[|｜]\s*[❌✅⏰🏖️🏥]*\s*\w*\s*$/, '').trim();
+      if (obs) tg += '   📝 '+esc(obs)+'\n';
+    }
+    tg += '\n';
+    wa += (i+1)+'. '+String(r[CH_MET.NOMBRE]||'-')+' | '+fecha+'\n';
+  });
+
+  if (filas.length > MAX_RES) tg += '...y '+(filas.length-MAX_RES)+' más.';
+  await enviar(chatId, tg);
+  await wa_send(chatId, wa);
+}
+
+// ============================================================
+// CHECADOR — ALERTAS
+// ============================================================
+
+async function cmdChAlertas(chatId, termino) {
+  const terminos = splitTerminos(termino);
+  if (terminos.length > 1) {
+    for (const t of terminos) { await cmdChAlertas(chatId, t); }
+    return;
+  }
+  await enviar(chatId,'🔔 Alertas empleados'+(termino?' "'+esc(termino)+'"':'')+'...');
+  const datos=await csv(ID.CHECADOR,'ALERTAS');
+  if (!datos){await enviar(chatId,'❌ Sin acceso al checador.');return;}
+  let filas=datos.slice(1).filter(function(r){return String(r[CH_ALERTA.TIPO]||'').trim();});
+  if (termino){
+    const tl=termino;
+    filas=filas.filter(function(r){return contieneNombre(r[CH_ALERTA.NOMBRE], tl);});
+  }
+  if (!filas.length){await enviar(chatId,'✅ Sin alertas'+(termino?' para "'+termino+'"':'')+'.');return;}
+
+  // Agrupar por empleado
+  const porEmpleado={};
+  filas.forEach(function(r){
+    const nom=String(r[CH_ALERTA.NOMBRE]||'Desconocido');
+    if (!porEmpleado[nom]) porEmpleado[nom]=[];
+    porEmpleado[nom].push(r);
+  });
+
+  const empleados=Object.keys(porEmpleado).slice(0,10);
+  let tg='🔔 <b>Alertas de Empleados</b>'+(termino?' · '+esc(termino):'')+'\n'+filas.length+' alertas · '+empleados.length+' empleados\n━━━━━━━━━━━━━━━━━\n\n';
+  let wa='ALERTAS EMPLEADOS\n'+filas.length+' alertas\n\n';
+
+  empleados.forEach(function(nom){
+    const alertas=porEmpleado[nom];
+    const sevCrit=alertas.filter(function(a){return String(a[CH_ALERTA.SEVERIDAD]||'').includes('CRÍTICA');}).length;
+    tg+='👤 <b>'+esc(nom)+'</b>'+(sevCrit>0?' ⚠️':'')+'\n';
+    wa+=nom+':\n';
+    alertas.forEach(function(a){
+      const sev=String(a[CH_ALERTA.SEVERIDAD]||'');
+      const sevIcon=sev.includes('CRÍTICA')?'🔴':sev.includes('ALTA')?'🟠':'🟡';
+      tg+='  '+sevIcon+' '+esc(String(a[CH_ALERTA.MENSAJE]||'-'))+'\n';
+      wa+='  '+String(a[CH_ALERTA.MENSAJE]||'-')+'\n';
+    });
+    tg+='\n'; wa+='\n';
+  });
+  if (Object.keys(porEmpleado).length>10) tg+='...y '+(Object.keys(porEmpleado).length-10)+' empleados más.';
+  await enviar(chatId,tg);await wa_send(chatId,wa);
+}
+
+// ============================================================
+// CHECADOR — ASISTENCIA (MÉTRICAS_DIARIAS)
+// ============================================================
+
+async function cmdAsistencia(chatId, consulta) {
+  const {fechaISO, fechaISOFin, fechaLabel, resto} = extraerFecha(consulta);
+  const terminos = splitTerminos(resto.trim());
+
+  if (terminos.length > 1) {
+    for (const t of terminos) {
+      await cmdAsistencia(chatId, t + (fechaLabel ? ' ' + fechaLabel : ''));
+    }
+    return;
+  }
+
+  const nombre = terminos[0] || '';
+
+  if (!nombre) { await enviar(chatId,'❓ Indica el nombre del empleado.\nEj: <code>asistencia Victor</code>\nEj: <code>asistencia Victor 25/03/2026</code>'); return; }
+
+  await enviar(chatId,'📋 Asistencia de <b>'+esc(nombre)+'</b>'+(fechaLabel?' · <b>'+esc(fechaLabel)+'</b>':'')+'...');
+  const datos=await csv(ID.CHECADOR,'METRICAS_DIARIAS');
+  if (!datos){await enviar(chatId,'❌ Sin acceso al checador.');return;}
+
+  const tl=nombre;
+  let filas=datos.slice(1).filter(function(r){return contieneNombre(r[CH_MET.NOMBRE], tl);});
+
+  // Detectar si el término matchea VARIOS empleados distintos (por ID)
+  // Para no mezclar "Pablo Armando" (ID 26) con "Armando Flores" (ID 27)
+  const empleadosUnicos = {};
+  filas.forEach(function(r){
+    const id = String(r[CH_MET.ID]||'').trim();
+    const nom = String(r[CH_MET.NOMBRE]||'').trim();
+    if (id && nom) empleadosUnicos[id] = nom;
+  });
+  const idsEncontrados = Object.keys(empleadosUnicos);
+
+  if (idsEncontrados.length > 1) {
+    let tg = '👥 Hay <b>'+idsEncontrados.length+'</b> empleados que coinciden con "<b>'+esc(nombre)+'</b>":\n━━━━━━━━━━━━━━━━━\n\n';
+    idsEncontrados.sort(function(a,b){ return empleadosUnicos[a].localeCompare(empleadosUnicos[b],'es'); });
+    idsEncontrados.forEach(function(id){
+      tg += '• <b>'+esc(empleadosUnicos[id])+'</b> (ID #'+esc(String(id).replace(/\.0$/,''))+')\n';
+    });
+    tg += '\n💡 Sé más específico con el nombre completo o usa el ID.\n';
+    tg += 'Ej: <code>asistencia '+esc(empleadosUnicos[idsEncontrados[0]].split(' ').slice(0,2).join(' '))+'</code>';
+    await enviar(chatId, tg);
+    return;
+  }
+
+  if (fechaISO) filas=filas.filter(function(r){return coincideFecha(r[CH_MET.FECHA], fechaISO, fechaISOFin);});
+
+  if (!filas.length){await enviar(chatId,'😔 Sin registros para <b>'+esc(nombre)+'</b>'+(fechaLabel?' del '+fechaLabel:'')+'.');return;}
+
+  // Si es una fecha específica → detalle del día
+  if (fechaISO && filas.length<=3) {
+    let tg='📋 <b>'+esc(filas[0][CH_MET.NOMBRE]||nombre)+'</b> · '+fechaLabel+'\n━━━━━━━━━━━━━━━━━\n\n';
+    let wa='ASISTENCIA '+nombre+' '+fechaLabel+'\n\n';
+    filas.forEach(function(r){
+      const est=String(r[CH_MET.ESTATUS]||'-');
+      const estIcon=est==='PUNTUAL'?'✅':est==='FALTA'?'❌':est.includes('RETARDO')?'⏰':'🟡';
+      const entrada=String(r[CH_MET.ENTRADA]||'Sin checada');
+      const salida=String(r[CH_MET.SALIDA]||'Sin checada');
+      const horas=parseFloat(String(r[CH_MET.HORAS]||'0'))||0;
+      const extra=parseFloat(String(r[CH_MET.HORAS_EXTRA]||'0'))||0;
+      const retardo=parseFloat(String(r[CH_MET.MIN_RETARDO]||'0'))||0;
+      tg+='📅 Turno: '+esc(String(r[CH_MET.TURNO]||'-'))+'\n'+
+          estIcon+' Estatus: <b>'+esc(est)+'</b>\n'+
+          '▶️ Entrada: <b>'+esc(entrada)+'</b>'+( retardo>0?' ('+retardo+' min retardo)':'')+'\n'+
+          '◀️ Salida: <b>'+esc(salida)+'</b>\n'+
+          '⏱️ Horas: <b>'+horas.toFixed(2)+'</b>'+(extra>0?' | Extra: <b>'+extra.toFixed(2)+'</b>':'')+'\n';
+      if (r[CH_MET.OBS]) {
+        const obs = String(r[CH_MET.OBS]).replace(/\s*[|｜]\s*[❌✅⏰🏖️🏥]*\s*\w*\s*$/, '').trim();
+        if (obs) tg+='📝 '+esc(obs)+'\n';
+      }
+      wa+=est+' | Entrada:'+entrada+' | Salida:'+salida+' | Horas:'+horas.toFixed(2)+'\n';
+    });
+    await enviar(chatId,tg);await wa_send(chatId,wa);
+    return;
+  }
+
+  // Sin fecha → resumen de últimos registros
+  // Ordenar por fecha descendente (más reciente primero) ANTES de tomar el top
+  filas.sort(function(a,b){
+    const fa = normalizarFecha(a[CH_MET.FECHA]);
+    const fb = normalizarFecha(b[CH_MET.FECHA]);
+    return fb.localeCompare(fa); // ISO yyyy-mm-dd ordena bien como string
+  });
+  const recientes=filas.slice(0,MAX_RES);
+  let faltas=0,retardos=0,puntuales=0;
+  filas.forEach(function(r){
+    const est=String(r[CH_MET.ESTATUS]||'');
+    if(est==='FALTA')faltas++;
+    else if(est.includes('RETARDO'))retardos++;
+    else if(est==='PUNTUAL')puntuales++;
+  });
+
+  let tg='📋 <b>'+esc(filas[0][CH_MET.NOMBRE]||nombre)+'</b>\n'+
+         filas.length+' registros | ✅ '+puntuales+' puntual | ⏰ '+retardos+' retardo | ❌ '+faltas+' falta\n━━━━━━━━━━━━━━━━━\n\n';
+  let wa='ASISTENCIA '+nombre+'\n'+filas.length+' días | Puntual:'+puntuales+' Retardo:'+retardos+' Falta:'+faltas+'\n\n';
+
+  recientes.forEach(function(r,i){
+    const est=String(r[CH_MET.ESTATUS]||'-');
+    const estIcon=est==='PUNTUAL'?'✅':est==='FALTA'?'❌':est.includes('RETARDO')?'⏰':'🟡';
+    const fecha=normalizarFecha(r[CH_MET.FECHA]);
+    const entrada=String(r[CH_MET.ENTRADA]||'--');
+    tg+=estIcon+' '+esc(fecha)+' · '+esc(est)+' · Entrada: '+esc(entrada)+'\n';
+    wa+=fecha+' '+est+' Entrada:'+entrada+'\n';
+  });
+  await enviar(chatId,tg);await wa_send(chatId,wa);
+}
+
+// ============================================================
+// CHECADOR — RESUMEN MENSUAL
+// ============================================================
+
+async function cmdResumen(chatId, consulta) {
+  const {fechaISO, fechaISOFin, fechaLabel, resto} = extraerFecha(consulta);
+  let mesISO = fechaISO ? fechaISO.substring(0,7) : null;
+  let mesLabel = fechaLabel;
+  let restoSinFecha = resto.trim();
+
+  // Detectar mes por nombre
+  if (!mesISO) {
+    const meses={'enero':'01','febrero':'02','marzo':'03','abril':'04','mayo':'05','junio':'06',
+                 'julio':'07','agosto':'08','septiembre':'09','octubre':'10','noviembre':'11','diciembre':'12'};
+    for (const [mes, num_mes] of Object.entries(meses)) {
+      const pat = new RegExp('\\b'+mes+'\\b', 'i');
+      if (restoSinFecha.match(pat)) {
+        const anio = restoSinFecha.match(/\b(20\d{2})\b/);
+        const y = anio ? anio[1] : new Date().getFullYear().toString();
+        mesISO = y+'-'+num_mes;
+        mesLabel = mes+' '+y;
+        restoSinFecha = restoSinFecha.replace(pat,'').replace(/\b20\d{2}\b/,'').replace(/\s+/g,' ').trim();
+        break;
+      }
+    }
+  }
+
+  const terminos = splitTerminos(restoSinFecha);
+  if (terminos.length > 1) {
+    for (const t of terminos) {
+      await cmdResumen(chatId, t + (mesLabel ? ' ' + mesLabel : ''));
+    }
+    return;
+  }
+
+  const nombre = terminos[0] || '';
+  if (!nombre){await enviar(chatId,'❓ Indica el nombre.\nEj: <code>resumen Victor</code>\nEj: <code>resumen Victor marzo 2026</code>');return;}
+
+  await enviar(chatId,'📊 Resumen de <b>'+esc(nombre)+'</b>'+(mesLabel?' · <b>'+esc(mesLabel)+'</b>':'')+'...');
+
+  // Cargar RESUMEN_MENSUAL y METRICAS_DIARIAS en paralelo
+  const [datosRes, datosMetr] = await Promise.all([
+    csv(ID.CHECADOR, 'RESUMEN_MENSUAL'),
+    csv(ID.CHECADOR, 'METRICAS_DIARIAS')
+  ]);
+  if (!datosRes){await enviar(chatId,'❌ Sin acceso al checador.');return;}
+
+  const tl = nombre;
+  let filas = datosRes.slice(1).filter(function(r){return contieneNombre(r[CH_RES.NOMBRE], tl);});
+
+  // Desambiguar si hay varios empleados distintos (por ID)
+  const empU = {};
+  filas.forEach(function(r){
+    const id = String(r[CH_RES.ID]||'').trim();
+    const nom = String(r[CH_RES.NOMBRE]||'').trim();
+    if (id && nom) empU[id] = nom;
+  });
+  const idsU = Object.keys(empU);
+  if (idsU.length > 1) {
+    let tg = '👥 Hay <b>'+idsU.length+'</b> empleados que coinciden con "<b>'+esc(nombre)+'</b>":\n━━━━━━━━━━━━━━━━━\n\n';
+    idsU.sort(function(a,b){ return empU[a].localeCompare(empU[b],'es'); });
+    idsU.forEach(function(id){ tg += '• <b>'+esc(empU[id])+'</b> (ID #'+esc(String(id).replace(/\.0$/,''))+')\n'; });
+    tg += '\n💡 Sé más específico con el nombre completo.';
+    await enviar(chatId, tg);
+    return;
+  }
+
+  if (mesISO) filas = filas.filter(function(r){return String(r[CH_RES.MES]||'').indexOf(mesISO)!==-1;});
+
+  if (!filas.length){await enviar(chatId,'😔 Sin resumen para <b>'+esc(nombre)+'</b>'+(mesLabel?' de '+mesLabel:'')+'.');return;}
+
+  // Construir lookup de METRICAS_DIARIAS por empleado+mes para contar correctamente
+  // solo los días que realmente tienen registro (evita contar eventualidades fuera del período)
+  const CH = { ID:0, NOMBRE:1, FECHA:2, ES_VAC:27, ES_ENF:28 };
+  const metricasMap = {}; // 'NOMBRE|YYYY-MM' → { vac, enf, fechas[] }
+  if (datosMetr) {
+    datosMetr.slice(1).forEach(function(r) {
+      const nom  = String(r[CH.NOMBRE]||'').trim();
+      const fecha = normalizarFecha(r[CH.FECHA]);
+      if (!nom || !fecha || fecha.length < 7) return;
+      const key = nom+'|'+fecha.substring(0,7);
+      if (!metricasMap[key]) metricasMap[key] = { vac:0, enf:0 };
+      if (sinAcentos(String(r[CH.ES_VAC]||'').toLowerCase()) === 'si' || String(r[CH.ES_VAC]||'').toLowerCase() === 'true') metricasMap[key].vac++;
+      if (sinAcentos(String(r[CH.ES_ENF]||'').toLowerCase()) === 'si' || String(r[CH.ES_ENF]||'').toLowerCase() === 'true') metricasMap[key].enf++;
+    });
+  }
+
+  let tg='📊 <b>Resumen: '+esc(filas[0][CH_RES.NOMBRE]||nombre)+'</b>'+(mesLabel?' · '+mesLabel:'')+'\n━━━━━━━━━━━━━━━━━\n\n';
+  let wa='RESUMEN '+nombre+(mesLabel?' '+mesLabel:'')+'\n\n';
+
+  filas.slice(0,6).forEach(function(r){
+    const mes   = normalizarFecha(r[CH_RES.MES]);
+    const pct   = parseFloat(String(r[CH_RES.PCT]||'0'))||0;
+    const nomReal = String(r[CH_RES.NOMBRE]||nombre);
+    const mesKey  = nomReal+'|'+(mes.length>=7 ? mes.substring(0,7) : mesISO||'');
+
+    // Usar conteo de METRICAS_DIARIAS para vac/enf (solo días con registro real)
+    const metr    = metricasMap[mesKey] || null;
+    const vacCount= metr !== null ? metr.vac  : num(r[CH_RES.VACACIONES]);
+    const enfCount= metr !== null ? metr.enf  : num(r[CH_RES.ENFERMEDAD]);
+
+    tg+='📅 <b>'+esc(mes)+'</b>\n'+
+        '✅ Trabajados: '+String(r[CH_RES.DIAS_T]||'0')+' días\n'+
+        '🎯 Puntuales: '+String(r[CH_RES.PUNTUALES]||'0')+' · ⏰ Retardos: '+String(r[CH_RES.RETARDOS]||'0')+'\n'+
+        '❌ Faltas: '+String(r[CH_RES.FALTAS]||'0')+' · 🏖️ Vacaciones: '+vacCount+'\n'+
+        '🏥 Enfermedades: '+enfCount+'\n'+
+        '⏱️ Horas totales: <b>'+String(r[CH_RES.HORAS]||'0')+'</b>\n'+
+        '📈 Puntualidad: <b>'+normPct(pct).toFixed(0)+'%</b>\n\n';
+    wa+=mes+' | Faltas:'+String(r[CH_RES.FALTAS]||'0')+' Retardos:'+String(r[CH_RES.RETARDOS]||'0')+' Horas:'+String(r[CH_RES.HORAS]||'0')+' Puntualidad:'+normPct(pct).toFixed(0)+'%\n';
+  });
+  await enviar(chatId,tg);await wa_send(chatId,wa);
+}
+
+// ============================================================
+// CHECADOR — VACACIONES
+// ============================================================
+
+async function cmdVacaciones(chatId, consulta) {
+  const {fechaISO, fechaISOFin, fechaLabel, resto} = extraerFecha(consulta);
+  const termino = resto.trim();
+  const terminos = splitTerminos(termino);
+  if (terminos.length > 1) {
+    for (const t of terminos) await cmdVacaciones(chatId, t+(fechaLabel?' '+fechaLabel:''));
+    return;
+  }
+
+  await enviar(chatId,'🏖️ Vacaciones'+(fechaLabel?' · <b>'+esc(fechaLabel)+'</b>':'')+(termino?' "'+esc(termino)+'"':'')+'...');
+  const datos=await csv(ID.CHECADOR,'EVENTUALIDADES');
+  if (!datos){await enviar(chatId,'❌ Sin acceso al checador.');return;}
+
+  let filas=datos.filter(function(r){
+    const id=r[CH_VAC.ID];
+    return id && !isNaN(parseFloat(String(id))) && String(r[CH_VAC.NOMBRE]||'').trim();
+  });
+
+  // Filtro por nombre
+  if (termino){
+    filas=filas.filter(function(r){return contieneNombre(r[CH_VAC.NOMBRE], termino);});
+
+    // Desambiguar si matchea varios empleados distintos (por ID)
+    const empU = {};
+    filas.forEach(function(r){
+      const id = String(r[CH_VAC.ID]||'').trim();
+      const nom = String(r[CH_VAC.NOMBRE]||'').trim();
+      if (id && nom) empU[id] = nom;
+    });
+    const idsU = Object.keys(empU);
+    if (idsU.length > 1) {
+      let tg = '👥 Hay <b>'+idsU.length+'</b> empleados que coinciden con "<b>'+esc(termino)+'</b>":\n━━━━━━━━━━━━━━━━━\n\n';
+      idsU.sort(function(a,b){ return empU[a].localeCompare(empU[b],'es'); });
+      idsU.forEach(function(id){ tg += '• <b>'+esc(empU[id])+'</b> (ID #'+esc(String(id).replace(/\.0$/,''))+')\n'; });
+      tg += '\n💡 Sé más específico con el nombre completo.';
+      await enviar(chatId, tg);
+      return;
+    }
+  }
+
+  // Filtro por fecha — verificar si la fecha cae dentro del rango inicio→fin
+  if (fechaISO) {
+    filas=filas.filter(function(r){
+      const ini = normalizarFecha(r[CH_VAC.INICIO]);
+      const fin = normalizarFecha(r[CH_VAC.FIN]);
+      if (!ini || !fin) return false;
+      // Si hay rango de fechas en la consulta
+      if (fechaISOFin) return ini <= fechaISOFin && fin >= fechaISO;
+      // Fecha única: verificar si cae dentro del período de vacaciones
+      return ini <= fechaISO && fin >= fechaISO;
+    });
+  }
+
+  if (!filas.length){await enviar(chatId,'😔 Sin vacaciones'+(fechaLabel?' para '+fechaLabel:'')+(termino?' para "'+termino+'"':'')+'.');return;}
+
+  // Ordenar por fecha de inicio descendente (más reciente primero)
+  filas.sort(function(a,b){ return normalizarFecha(b[CH_VAC.INICIO]).localeCompare(normalizarFecha(a[CH_VAC.INICIO])); });
+
+  let tg='🏖️ <b>Vacaciones</b>'+(fechaLabel?' · '+fechaLabel:'')+(termino?' · '+esc(termino):'')+'\n'+filas.length+' registros\n━━━━━━━━━━━━━━━━━\n\n';
+
+  filas.slice(0,MAX_RES).forEach(function(r,i){
+    const ini = normalizarFecha(r[CH_VAC.INICIO]);
+    const fin = normalizarFecha(r[CH_VAC.FIN]);
+    const iniD = ini ? isoADisplay(ini) : '-';
+    const finD = fin ? isoADisplay(fin) : '-';
+
+    // Calcular días de la semana entre inicio y fin (sin sábado ni domingo)
+    const DIAS = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+    let diasStr = '';
+    if (ini && fin) {
+      const partsIni = ini.split('-');
+      const partsFin = fin.split('-');
+      const dIni = new Date(parseInt(partsIni[0]), parseInt(partsIni[1])-1, parseInt(partsIni[2]));
+      const dFin = new Date(parseInt(partsFin[0]), parseInt(partsFin[1])-1, parseInt(partsFin[2]));
+      const diasLista = [];
+      const cur = new Date(dIni);
+      while (cur <= dFin) {
+        const dow = cur.getDay();
+        if (dow !== 0 && dow !== 6) { // excluir sáb y dom
+          const dd = String(cur.getDate()).padStart(2,'0');
+          const mm = String(cur.getMonth()+1).padStart(2,'0');
+          diasLista.push(DIAS[dow]+' '+dd+'/'+mm);
+        }
+        cur.setDate(cur.getDate()+1);
+      }
+      if (diasLista.length) {
+        diasStr = '   📆 '+diasLista.length+' día(s): '+diasLista.join(' · ')+'\n';
+      }
+    }
+
+    tg+=(i+1)+'. <b>'+esc(extractName(r[CH_VAC.NOMBRE]))+'</b>\n'+
+        '   📅 '+esc(iniD)+' → '+esc(finD)+'\n'+
+        diasStr+'\n';
+  });
+  if (filas.length>MAX_RES) tg+='...y '+(filas.length-MAX_RES)+' más.';
+  await enviar(chatId,tg);
+}
+
+// ============================================================
+// CHECADOR — ENFERMEDADES
+// ============================================================
+
+async function cmdEnfermedades(chatId, termino) {
+  await enviar(chatId,'🏥 Enfermedades'+(termino?' "'+esc(termino)+'"':'')+'...');
+  const datos=await csv(ID.CHECADOR,'EVENTUALIDADES');
+  if (!datos){await enviar(chatId,'❌ Sin acceso al checador.');return;}
+
+  // Enfermedades están en cols 5-10
+  let filas=datos.filter(function(r){
+    const id=r[CH_ENF.ID];
+    return id && !isNaN(parseFloat(String(id))) && String(r[CH_ENF.NOMBRE]||'').trim();
+  });
+
+  if (termino){
+    const tl=termino;
+    filas=filas.filter(function(r){return contieneNombre(r[CH_ENF.NOMBRE], tl);});
+
+    // Desambiguar si matchea varios empleados distintos (por ID)
+    const empU = {};
+    filas.forEach(function(r){
+      const id = String(r[CH_ENF.ID]||'').trim();
+      const nom = String(r[CH_ENF.NOMBRE]||'').trim();
+      if (id && nom) empU[id] = nom;
+    });
+    const idsU = Object.keys(empU);
+    if (idsU.length > 1) {
+      let tg = '👥 Hay <b>'+idsU.length+'</b> empleados que coinciden con "<b>'+esc(termino)+'</b>":\n━━━━━━━━━━━━━━━━━\n\n';
+      idsU.sort(function(a,b){ return empU[a].localeCompare(empU[b],'es'); });
+      idsU.forEach(function(id){ tg += '• <b>'+esc(empU[id])+'</b> (ID #'+esc(String(id).replace(/\.0$/,''))+')\n'; });
+      tg += '\n💡 Sé más específico con el nombre completo.';
+      await enviar(chatId, tg);
+      return;
+    }
+  }
+
+  if (!filas.length){await enviar(chatId,'😔 Sin enfermedades registradas'+(termino?' para "'+termino+'"':'')+'.');return;}
+
+  // Ordenar por fecha descendente (más reciente primero)
+  filas.sort(function(a,b){ return normalizarFecha(b[CH_ENF.FECHA]).localeCompare(normalizarFecha(a[CH_ENF.FECHA])); });
+
+  let tg='🏥 <b>Enfermedades/Permisos</b>'+(termino?' · '+esc(termino):'')+'\n'+filas.length+' registros\n━━━━━━━━━━━━━━━━━\n\n';
+  let wa='ENFERMEDADES'+(termino?' - '+termino:'')+'\n\n';
+
+  filas.slice(0,MAX_RES).forEach(function(r,i){
+    const fecha=normalizarFecha(r[CH_ENF.FECHA]);
+    const tipo=String(r[CH_ENF.TIPO]||'-');
+    tg+=(i+1)+'. <b>'+esc(extractName(r[CH_ENF.NOMBRE]))+'</b>\n'+
+        '   📅 '+esc(fecha)+' | '+esc(tipo)+'\n\n';
+    wa+=(i+1)+'. '+extractName(r[CH_ENF.NOMBRE])+' | '+fecha+' | '+tipo+'\n';
+  });
+  if (filas.length>MAX_RES) tg+='...y '+(filas.length-MAX_RES)+' más.';
+  await enviar(chatId,tg);await wa_send(chatId,wa);
+}
+
+// ============================================================
+// CHECADOR — TURNOS Y HORARIOS
+// ============================================================
+
+async function cmdTurno(chatId, termino) {
+  const terminos = splitTerminos(termino);
+  if (terminos.length > 1) {
+    for (const t of terminos) { await cmdTurno(chatId, t); }
+    return;
+  }
+  await enviar(chatId,'⏰ Turnos'+(termino?' "'+esc(termino)+'"':'')+'...');
+  const datos=await csv(ID.CHECADOR,'TURNOS_DEFAULT');
+  if (!datos){await enviar(chatId,'❌ Sin acceso al checador.');return;}
+
+  let filas=datos.slice(1).filter(function(r){return !isNaN(parseFloat(String(r[CH_TURNO.ID]||'')))&&String(r[CH_TURNO.NOMBRE]||'').trim();});
+
+  if (termino){
+    const tl=termino;
+    filas=filas.filter(function(r){
+      return contieneNombre(r[CH_TURNO.NOMBRE], tl)||
+             contiene(r[CH_TURNO.DEPTO], tl)||
+             contiene(r[CH_TURNO.TURNO], tl);
+    });
+
+    // Si el término matchea por NOMBRE a varios empleados distintos
+    // (y NO es una búsqueda por departamento/turno), pedir especificar
+    const matchPorNombre = filas.filter(function(r){ return contieneNombre(r[CH_TURNO.NOMBRE], tl); });
+    const matchPorOtro   = filas.filter(function(r){ return !contieneNombre(r[CH_TURNO.NOMBRE], tl); });
+    if (matchPorNombre.length > 1 && matchPorOtro.length === 0) {
+      const empU = {};
+      matchPorNombre.forEach(function(r){
+        const id = String(r[CH_TURNO.ID]||'').trim();
+        const nom = String(r[CH_TURNO.NOMBRE]||'').trim();
+        if (id && nom) empU[id] = nom;
+      });
+      const idsU = Object.keys(empU);
+      if (idsU.length > 1) {
+        let tg = '👥 Hay <b>'+idsU.length+'</b> empleados que coinciden con "<b>'+esc(termino)+'</b>":\n━━━━━━━━━━━━━━━━━\n\n';
+        idsU.sort(function(a,b){ return empU[a].localeCompare(empU[b],'es'); });
+        idsU.forEach(function(id){ tg += '• <b>'+esc(empU[id])+'</b> (ID #'+esc(String(id).replace(/\.0$/,''))+')\n'; });
+        tg += '\n💡 Sé más específico con el nombre completo.';
+        await enviar(chatId, tg);
+        return;
+      }
+    }
+  }
+
+  if (!filas.length){await enviar(chatId,'😔 Sin registros'+(termino?' para "'+termino+'"':'')+'.');return;}
+
+  const top=filas.slice(0,MAX_RES);
+  let tg='⏰ <b>Turnos y Horarios</b>'+(termino?' · '+esc(termino):'')+'\n'+filas.length+' empleados\n━━━━━━━━━━━━━━━━━\n\n';
+  let wa='TURNOS'+(termino?' - '+termino:'')+'\n\n';
+
+  top.forEach(function(r,i){
+    const cumple   = String(r[CH_TURNO.CUMPLE]||'-');
+    const contrat  = String(r[CH_TURNO.CONTRAT]||'-');
+    const vacRest  = String(r[CH_TURNO.VAC_REST]||'0');
+    const vacTotal = String(r[CH_TURNO.VAC_TOTAL]||'0');
+    const vacUsados= String(r[CH_TURNO.VAC_USADOS]||'0');
+    const bono     = String(r[CH_TURNO.BONO]||'-');
+
+    // Calcular antigüedad real desde fecha de contratación
+    let antiguedad = '-';
+    if (contrat && contrat !== '-') {
+      try {
+        // Soporta DD/MM/YYYY y YYYY-MM-DD
+        let d, m, y;
+        const mDMY = contrat.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+        const mYMD = contrat.match(/^(\d{4})[\/\-](\d{2})[\/\-](\d{2})$/);
+        if (mDMY)      { d=parseInt(mDMY[1]); m=parseInt(mDMY[2]); y=parseInt(mDMY[3]); }
+        else if (mYMD) { y=parseInt(mYMD[1]); m=parseInt(mYMD[2]); d=parseInt(mYMD[3]); }
+
+        if (d && m && y) {
+          const now = new Date();
+          const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+          const mx  = new Date(utc + (-6 * 60 * 60000));
+          const contratDate = new Date(y, m-1, d);
+          let anios = mx.getFullYear() - contratDate.getFullYear();
+          let meses = mx.getMonth() - contratDate.getMonth();
+          let dias  = mx.getDate() - contratDate.getDate();
+          if (dias < 0) { meses--; dias += new Date(mx.getFullYear(), mx.getMonth(), 0).getDate(); }
+          if (meses < 0) { anios--; meses += 12; }
+          antiguedad = anios+'a '+meses+'m '+dias+'d';
+        }
+      } catch(e) { antiguedad = '-'; }
+    }
+
+    tg+=(i+1)+'. <b>'+esc(String(r[CH_TURNO.NOMBRE]||'-'))+'</b> · <code>#'+esc(String(r[CH_TURNO.ID]||'-'))+'</code>\n'+
+        '   ⏰ '+esc(String(r[CH_TURNO.TURNO]||'-'))+' | '+esc(String(r[CH_TURNO.HORARIO]||'-'))+'\n'+
+        '   🏢 Depto: '+esc(String(r[CH_TURNO.DEPTO]||'-'))+'\n'+
+        '   🎂 Cumpleaños: '+esc(cumple)+'\n'+
+        '   📅 Contratación: '+esc(contrat)+' | 📆 Antigüedad: '+esc(antiguedad)+'\n'+
+        '   🏖️ Vacaciones: '+vacUsados+' tomados · '+vacRest+' restantes · '+vacTotal+' al año\n'+
+        '   🎁 Bono puntualidad: '+esc(bono)+'\n\n';
+    wa+=(i+1)+'. '+String(r[CH_TURNO.NOMBRE]||'-')+' | '+String(r[CH_TURNO.TURNO]||'-')+' '+String(r[CH_TURNO.HORARIO]||'-')+' | Vac:'+vacRest+' días\n';
+  });
+  if (filas.length>MAX_RES) tg+='...y '+(filas.length-MAX_RES)+' más.';
+  await enviar(chatId,tg);await wa_send(chatId,wa);
+}
+
+// ============================================================
+// BUSCAR POR NÚMERO SO EN TODOS LOS CANALES
+// ============================================================
+
+async function cmdVentaBuscarSO(chatId, termino) {
+  const terminos = splitTerminos(termino);
+  if (terminos.length > 1) {
+    for (const t of terminos) await cmdVentaBuscarSO(chatId, t);
+    return;
+  }
+
+  await enviar(chatId, '🔍 Buscando orden <b>'+esc(termino)+'</b> en todos los canales...');
+
+  const tl = sinAcentos(termino);
+  const resultados = [];
+
+  // Buscar en paralelo en todas las hojas de canal
+  await Promise.all(HOJAS_CANAL.map(async function(hojaCanal) {
+    try {
+      const datos = await csv(ID.VENTA_DIARIA, hojaCanal);
+      if (!datos || datos.length < 2) return;
+
+      const filas = datos.slice(1).filter(function(r) {
+        // Buscar en columna SO [1] y también en SKU [6] y producto [7]
+        return [CANAL.SO, CANAL.SKU, CANAL.PRODUCTO].some(function(i) {
+          return sinAcentos(String(r[i]||'')).indexOf(tl) !== -1;
+        });
+      });
+
+      filas.forEach(function(r) {
+        resultados.push({ canal: hojaCanal, row: r });
+      });
+    } catch(e) {
+      console.error('Error buscando en '+hojaCanal+': '+e.message);
+    }
+  }));
+
+  console.log('Búsqueda SO "'+termino+'": '+resultados.length+' resultados');
+
+  if (!resultados.length) {
+    await enviar(chatId, '😔 No se encontró la orden <b>'+esc(termino)+'</b> en ningún canal.');
+    return;
+  }
+
+  const top = resultados.slice(0, MAX_RES);
+  let tg = '🧾 <b>Orden: '+esc(termino)+'</b>\n'+resultados.length+' resultado(s)\n━━━━━━━━━━━━━━━━━\n\n';
+
+  top.forEach(function(item, i) {
+    const r     = item.row;
+    const fecha = normalizarFecha(r[CANAL.FECHA]);
+    const prod  = String(r[CANAL.PRODUCTO]||'-').replace(/^\[.+?\]\s*/,'');
+    const imp   = '$'+String(r[CANAL.IMPORTE]||'0').replace(/[$,\s]/g,'');
+    const total = '$'+String(r[CANAL.TOTAL]||'0').replace(/[$,\s]/g,'');
+
+    tg += (i+1)+'. 🏪 <b>'+esc(item.canal)+'</b>\n'+
+          '   📋 SO: <code>'+esc(String(r[CANAL.SO]||'-'))+'</code>\n'+
+          '   📅 '+esc(fecha)+' | '+esc(String(r[CANAL.ESTADO]||'-'))+'\n'+
+          '   🏷️ <code>'+esc(r[CANAL.SKU]||'-')+'</code>\n'+
+          '   '+esc(prod.substring(0,55))+(prod.length>55?'...':'')+'\n'+
+          '   Qty: '+String(r[CANAL.CANTIDAD]||'-')+' | Importe: '+imp+' | Total: '+total+'\n\n';
+  });
+
+  if (resultados.length > MAX_RES) tg += '...y '+(resultados.length-MAX_RES)+' más.';
+  await enviar(chatId, tg);
+}
+// ============================================================
+// TRASLADOS — busca en TODAS las hojas del Sheet
+// "traslados pick28870"  → WH/PICK/28870
+// "traslados pack30281"  → WH/PACK/30281
+// "traslados out88304"   → WH/OUT/88304
+// "traslados S24527"     → por SO
+// "traslados rastreo 46726640000" → por guía
+// ============================================================
+
+async function cmdTraslados(chatId, consulta) {
+  if (!consulta) {
+    await enviar(chatId,
+      '🚛 <b>Traslados</b>\n\n'+
+      '<code>traslados hoy</code> · <code>traslados 25/03/2026</code>\n'+
+      '<code>traslados walmart hoy</code> · <code>traslados ml</code>\n'+
+      '<code>traslados pick28870</code>\n'+
+      '<code>traslados pack30281</code>\n'+
+      '<code>traslados out88304</code>\n'+
+      '<code>traslados S24527</code> — por SO\n'+
+      '<code>traslados rastreo 46726640000</code> — por guía'
+    );
+    return;
+  }
+
+  // Extraer fecha/rango
+  const {fechaISO, fechaISOFin, fechaLabel, resto: restoFecha} = extraerFecha(consulta);
+
+  // Modo rastreo
+  const mRastreo = restoFecha.match(/^rastreo\s+(.+)$/i);
+  const esModoRastreo = !!mRastreo;
+  let termino = mRastreo ? mRastreo[1].trim() : restoFecha.trim();
+
+  // Detectar pick/pack/out
+  let refBuscar = null;
+  if (!esModoRastreo) {
+    const mRef = termino.match(/^(pick|pack|out)\s*\/?\ *(\d+)$/i);
+    if (mRef) refBuscar = 'WH/'+mRef[1].toUpperCase()+'/'+mRef[2];
+  }
+
+  // Detectar contacto/canal
+  const contactosKW = [
+    ['ml electronics mexico','ML ELECTRONICS MEXICO'],
+    ['ml electronics','ML ELECTRONICS'],
+    ['ml leongem','ML LEONGEM'],
+    ['ml vip','ML VIP ELECTRONICS'],
+    ['mercado libre','ML ELECTRONICS'],
+    ['walmart','WALMART'],['sears','SEARS'],
+    ['liverpool','LIV'],['liv','LIV'],
+    ['sanborns','SANBORNS'],['coppel','COPPEL'],
+    ['tiktok','TIKTOK'],['elektra','ELEKTRA'],
+    ['totalplay','TOTALPLAY'],['tiendanube','TIENDANUBE'],
+    ['sin cliente','SIN CLIENTE'],['ml','ML ELECTRONICS']
+  ];
+  let contactoFiltro = null;
+  const kwSorted = contactosKW.slice().sort(function(a,b){return b[0].length-a[0].length;});
+  for (const [k, v] of kwSorted) {
+    if (sinAcentos(termino).indexOf(k) !== -1) {
+      contactoFiltro = v;
+      termino = termino.replace(new RegExp(k,'gi'),'').replace(/\s+/g,' ').trim();
+      break;
+    }
+  }
+
+  // Label
+  const partes = [];
+  if (termino && !refBuscar && !esModoRastreo) partes.push('"'+termino+'"');
+  if (refBuscar)      partes.push(refBuscar);
+  if (esModoRastreo)  partes.push('Guía: '+termino);
+  if (contactoFiltro) partes.push(contactoFiltro);
+  if (fechaLabel)     partes.push(fechaLabel);
+  const label = partes.length ? partes.join(' · ') : 'todos';
+
+  await enviar(chatId, '🚛 Traslados · <b>'+esc(label)+'</b>...');
+
+  const listaHojas = await getTrasHojas();
+  if (!listaHojas || !listaHojas.length) {
+    await enviar(chatId, '❌ Sin acceso al Sheet de traslados. Verifica que esté público.');
+    return;
+  }
+
+  const tl = sinAcentos(termino);
+  const resultados = [];
+
+  await Promise.all(listaHojas.map(async function(hoja) {
+    try {
+      const datos = await csv(ID_TRASLADOS, hoja);
+      if (!datos || datos.length < 3) return;
+      const filas = datos.slice(2).filter(function(r){
+        return String(r[TRAS.SO]||'').trim() !== '';
+      });
+      const encontradas = filas.filter(function(r) {
+        // Filtro fecha
+        if (fechaISO) {
+          const fechas = [r[TRAS.PICK_FHECHO], r[TRAS.PACK_FHECHO], r[TRAS.OUT_FHECHO]];
+          if (!fechas.some(function(f){ return f && coincideFecha(f, fechaISO, fechaISOFin); })) return false;
+        }
+        // Filtro contacto
+        if (contactoFiltro) {
+          const cf = sinAcentos(contactoFiltro);
+          const cols = [TRAS.PICK_CONT, TRAS.PACK_CONT, TRAS.OUT_CONT];
+          if (!cols.some(function(i){ return sinAcentos(String(r[i]||'')).indexOf(cf) !== -1; })) return false;
+        }
+        // Filtro término
+        if (esModoRastreo) {
+          return [TRAS.GUIA_GLOBAL,TRAS.PICK_GUIA,TRAS.PACK_GUIA,TRAS.OUT_GUIA].some(function(i){
+            const v=sinAcentos(String(r[i]||'')); return v&&v.indexOf(tl)!==-1;
+          });
+        } else if (refBuscar) {
+          const ref=sinAcentos(refBuscar);
+          return [TRAS.PICK_REF,TRAS.PACK_REF,TRAS.OUT_REF].some(function(i){
+            return sinAcentos(String(r[i]||''))===ref;
+          });
+        } else if (tl) {
+          return sinAcentos(String(r[TRAS.SO]||'')).indexOf(tl)!==-1 ||
+            [TRAS.PICK_REF,TRAS.PACK_REF,TRAS.OUT_REF,
+             TRAS.PICK_DOC,TRAS.PACK_DOC,TRAS.OUT_DOC,
+             TRAS.GUIA_GLOBAL,TRAS.PICK_GUIA,TRAS.PACK_GUIA,TRAS.OUT_GUIA].some(function(i){
+              return sinAcentos(String(r[i]||'')).indexOf(tl)!==-1;
+            });
+        }
+        return true; // solo filtros de fecha/contacto
+      });
+      encontradas.forEach(function(r){ resultados.push({hoja,r}); });
+    } catch(e){ console.error('Traslados '+hoja+': '+e.message); }
+  }));
+
+  console.log('Traslados "'+consulta+'": '+resultados.length);
+
+  if (!resultados.length) {
+    await enviar(chatId, '😔 Sin resultados para <b>'+esc(label)+'</b>.');
+    return;
+  }
+
+  function fmtSO(v){ const n=parseFloat(String(v||'')); return (!isNaN(n)&&n>1e10)?n.toFixed(0):String(v||'-'); }
+  function estIcon(e){ return e==='Hecho'?'✅':e==='En proceso'?'🔄':e?'🟡':'⬜'; }
+
+  // Resumen si son muchos y es búsqueda por fecha/canal
+  if (resultados.length > 5 && (fechaISO||contactoFiltro) && !refBuscar && !esModoRastreo && !tl) {
+    const total=resultados.length;
+    const hechos=resultados.filter(function(x){return String(x.r[TRAS.OUT_EST]||'')==='Hecho';}).length;
+    const enProc=resultados.filter(function(x){return String(x.r[TRAS.OUT_EST]||'')==='En proceso';}).length;
+    let tg='🚛 <b>Traslados · '+esc(label)+'</b>\n'+total+' órdenes\n━━━━━━━━━━━━━━━━━\n'+
+           '✅ OUT Hecho: <b>'+hechos+'</b>\n'+
+           '🔄 OUT En proceso: <b>'+enProc+'</b>\n'+
+           '🟡 OUT Pendiente: <b>'+(total-hechos-enProc)+'</b>\n\n'+
+           'Primeros '+Math.min(total,MAX_RES)+':\n';
+    resultados.slice(0,MAX_RES).forEach(function(item){
+      const r=item.r;
+      const outEst=String(r[TRAS.OUT_EST]||'-');
+      const guia=String(r[TRAS.GUIA_GLOBAL]||r[TRAS.OUT_GUIA]||'');
+      tg+=estIcon(outEst)+' '+esc(fmtSO(r[TRAS.SO]))+' · <code>'+esc(String(r[TRAS.OUT_REF]||'-'))+'</code>'+(guia?' 📦<code>'+esc(guia)+'</code>':'')+' '+esc(outEst)+'\n';
+    });
+    if (total>MAX_RES) tg+='...y '+(total-MAX_RES)+' más.';
+    await enviar(chatId,tg);
+    return;
+  }
+
+  for (const item of resultados.slice(0,5)) {
+    const r=item.r;
+    const guiaGlob=String(r[TRAS.GUIA_GLOBAL]||'');
+    const sku     =String(r[TRAS.SKU]||'');
+    const piezas  =String(r[TRAS.PIEZAS]||'');
+    const contacto=String(r[TRAS.PICK_CONT]||r[TRAS.PACK_CONT]||r[TRAS.OUT_CONT]||'-');
+    const wave=String(r[TRAS.PICK_WAVE]||r[TRAS.PACK_WAVE]||r[TRAS.OUT_WAVE]||'-');
+    let tg='🚛 <b>SO: '+esc(fmtSO(r[TRAS.SO]))+'</b>'+(listaHojas.length>1?' <i>('+esc(item.hoja)+')</i>':'')+
+           '\n👤 '+esc(contacto)+' | 🌊 '+esc(wave)+'\n';
+    if (sku)      tg+='🏷️ <code>'+esc(sku)+'</code>'+(piezas?' | 📦 <b>'+esc(piezas)+'</b> pzs':'')+'\n';
+    if (guiaGlob) tg+='📮 Guía: <code>'+esc(guiaGlob)+'</code>\n';
+    tg+='━━━━━━━━━━━━━━━━━\n';
+    [[TRAS.PICK_REF,TRAS.PICK_EST,TRAS.PICK_FHECHO,TRAS.PICK_GUIA,'PICK'],
+     [TRAS.PACK_REF,TRAS.PACK_EST,TRAS.PACK_FHECHO,TRAS.PACK_GUIA,'PACK'],
+     [TRAS.OUT_REF, TRAS.OUT_EST, TRAS.OUT_FHECHO, TRAS.OUT_GUIA, 'OUT']
+    ].forEach(function(c){
+      const ref=String(r[c[0]]||'-'),est=String(r[c[1]]||'-'),
+            date=String(r[c[2]]||'-'),guia=String(r[c[3]]||'');
+      tg+=estIcon(est)+' <b>'+c[4]+'</b> <code>'+esc(ref)+'</code> · '+esc(est)+' | '+esc(date)+'\n';
+      if (guia) tg+='   📮 <code>'+esc(guia)+'</code>\n';
+    });
+  await enviar(chatId,tg);
+  }
+  if (resultados.length>5) await enviar(chatId,'...y '+(resultados.length-5)+' más. Refina la búsqueda.');
+}
+
+async function getTrasHojas() {
+  // Intentar hojas conocidas: "Consolidado por SO", "Consolidado por SO 2", etc.
+  // El Sheet crea hojas nuevas con el mismo nombre + número
+  const candidatas = [
+    'Consolidado por SO',
+    'Consolidado por SO 2',
+    'Consolidado por SO 3',
+    'Consolidado por SO 4',
+    'Consolidado por SO 5'
+  ];
+  const hojas = [];
+  await Promise.all(candidatas.map(async function(h) {
+    try {
+      const r = await fetch(
+        'https://docs.google.com/spreadsheets/d/'+ID_TRASLADOS+'/gviz/tq?tqx=out:csv&sheet='+encodeURIComponent(h),
+        { signal: AbortSignal.timeout(6000) }
+      );
+      if (r.ok) {
+        const text = await r.text();
+        // Verificar que tiene datos reales (más de 3 líneas)
+        if (text.split('\n').length > 3) hojas.push(h);
+      }
+    } catch(e) { /* hoja no existe */ }
+  }));
+  // Ordenar para procesar en orden
+  return hojas.sort();
+}
+
+// ============================================================
+// PRECIOS — busca SKU en CONCENTRADO + MINIMO + MAXIMO
+// "precio HP" / "precio 2061" / "precio HP walmart" / "precio maximo Canon"
+// ============================================================
+
+async function cmdPrecios(chatId, consulta) {
+  // 1. Detectar hoja específica al inicio: "maximo X" / "minimo X" / "concentrado X"
+  const mHoja = consulta.match(/^(maximo|minimo|concentrado)\s+(.+)$/i);
+  let hojaFiltro = null;
+  let termino = consulta;
+  if (mHoja) {
+    const map = {maximo:'MAXIMO', minimo:'MINIMO', concentrado:'CONCENTRADO'};
+    hojaFiltro = map[mHoja[1].toLowerCase()];
+    termino = mHoja[2].trim();
+  }
+
+  // 2. Detectar TODOS los canales mencionados (pueden ser varios: "Walmart, Liverpool")
+  const canalesKW = [
+    ['tienda nube','TIENDA NUBE'],['tiktok shop','TIKTOK SHOP'],
+    ['mercado libre','MELI'],['tiendanube','TIENDANUBE'],
+    ['aliexpress','ALIEXPRESS'],['totalplay','TOTALPLAY'],
+    ['liverpool','LIVERPOOL'],['sanborns','SANBORNS'],
+    ['elektra','ELEKTRA'],['coppel','COPPEL'],['sears','SEARS'],
+    ['walmart','WALMART'],['meli','MELI'],['tiktok','TIKTOK SHOP'],
+    ['ml','ML'],['liv','LIV']
+  ];
+  const canalesFiltro = [];
+  let terminoLimpio = termino;
+  for (const [k, v] of canalesKW) {
+    if (sinAcentos(terminoLimpio).indexOf(k) !== -1) {
+      if (canalesFiltro.indexOf(v) === -1) canalesFiltro.push(v);
+      terminoLimpio = terminoLimpio.replace(new RegExp(k,'gi'),'');
+    }
+  }
+  // Limpiar comas y espacios sobrantes del término tras quitar canales
+  terminoLimpio = terminoLimpio.replace(/,/g,' ').replace(/\s+/g,' ').trim();
+
+  // 3. Si hay canales detectados, NO hacer split — el término es lo que queda
+  //    Si NO hay canales, hacer split para multi-término
+  if (canalesFiltro.length === 0) {
+    const terminos = splitTerminos(terminoLimpio);
+    if (terminos.length > 1) {
+      for (const t of terminos) {
+        await cmdPrecios(chatId, (hojaFiltro?hojaFiltro+' ':'')+t);
+      }
+      return;
+    }
+  }
+
+  termino = terminoLimpio;
+
+  if (!termino && canalesFiltro.length === 0) {
+    await enviar(chatId,
+      '🏷️ Indica SKU, nombre, modelo o últimos 4 dígitos:\n'+
+      '<code>precio HP</code> · <code>precio 3093</code>\n'+
+      '<code>precio 3093 walmart</code> — filtra canal\n'+
+      '<code>precio 3093 walmart, liverpool</code> — múltiples canales\n'+
+      '<code>precio maximo Canon</code> — hoja específica');
+    return;
+  }
+
+  const canalLabel = canalesFiltro.length ? canalesFiltro.join(', ') : '';
+  await enviar(chatId, '🏷️ Precio <b>'+esc(termino||'todos')+'</b>'+(canalLabel?' · '+esc(canalLabel):'')+(hojaFiltro?' ('+esc(hojaFiltro)+')':'')+'...');
+
+  function fmtP(v) {
+    const n = parseFloat(String(v||'').replace(/[$,]/g,''));
+    return isNaN(n)||n===0 ? null : '$'+n.toLocaleString('es-MX',{minimumFractionDigits:0});
+  }
+
+  const tl = sinAcentos(termino);
+  const hojas = hojaFiltro ? [hojaFiltro] : ['CONCENTRADO','MINIMO','MAXIMO'];
+  const csvs = await Promise.all(hojas.map(function(h){ return csv(ID.PRECIOS, h); }));
+
+  let encontrado = false;
+
+  for (let i=0; i<hojas.length; i++) {
+    const hoja = hojas[i];
+    const datos = csvs[i];
+    if (!datos || datos.length < 3) continue;
+
+    const filas = datos.slice(2).filter(function(r){ return String(r[1]||'').trim()!==''; });
+
+    // Buscar por SKU, nombre o últimos 4 dígitos
+    const res = tl ? filas.filter(function(r) {
+      const sku = sinAcentos(String(r[1]||''));
+      const nom = sinAcentos(String(r[0]||''));
+      return sku.indexOf(tl)!==-1 || nom.indexOf(tl)!==-1 || (tl.length===4 && sku.slice(-4)===tl);
+    }) : filas;
+
+    if (!res.length) continue;
+    encontrado = true;
+
+    // Filtrar columnas por canales solicitados (si hay), o mostrar todos
+    const todosCanales = PRECIOS_CANALES[hoja] || [];
+    const canalesMostrar = canalesFiltro.length
+      ? todosCanales.filter(function(c) {
+          return canalesFiltro.some(function(cf) {
+            return sinAcentos(c.label).indexOf(sinAcentos(cf)) !== -1;
+          });
+        })
+      : todosCanales;
+
+    for (const r of res.slice(0,5)) {
+      let tg = '🏷️ <b>'+esc(hoja)+'</b>\n'+
+               '📦 '+esc(String(r[0]||'-').substring(0,60))+'\n'+
+               '🔑 <code>'+esc(String(r[1]||'-'))+'</code>\n━━━━━━━━━━━━━━━━━\n';
+      canalesMostrar.forEach(function(col) {
+        const pC = fmtP(r[col.C]);
+        const pP = col.P!==null ? fmtP(r[col.P]) : null;
+        if (!pC && !pP) return;
+        if (pP) tg += '🏪 <b>'+esc(col.label)+'</b>: C:'+(pC||'-')+' · P:'+pP+'\n';
+        else    tg += '🏪 <b>'+esc(col.label)+'</b>: '+pC+'\n';
+      });
+  await enviar(chatId, tg);
+    }
+    if (res.length>5) await enviar(chatId, '...y '+(res.length-5)+' más en '+hoja+'.');
+  }
+
+  if (!encontrado) await enviar(chatId, '😔 Sin precios para <b>'+esc(termino||canalLabel)+'</b>.');
+}
+
+// ============================================================
+// ENTRADAS — FECHA[0], SKU[1], REFERENCIA ODOO[2], LLEGARON[3]
+// "entradas" / "entradas hoy" / "entradas CAN-EOS" / "entradas 1859"
+// ============================================================
+
+async function cmdEntradas(chatId, consulta) {
+  const {fechaISO, fechaISOFin, fechaLabel, resto} = extraerFecha(consulta);
+  const terminos = splitTerminos(resto.trim());
+
+  if (terminos.length > 1) {
+    for (const t of terminos) await cmdEntradas(chatId, t+(fechaLabel?' '+fechaLabel:''));
+    return;
+  }
+
+  const termino = terminos[0] || '';
+  await enviar(chatId, '📦 Entradas'+(fechaLabel?' · <b>'+esc(fechaLabel)+'</b>':'')+(termino?' "'+esc(termino)+'"':'')+'...');
+
+  const datos = await csv(ID.PRECIOS, 'ENTRADAS');
+  if (!datos) { await enviar(chatId, '❌ Sin acceso.'); return; }
+
+  // Fila 1=headers, fila 2=separadores "-", datos desde fila 3
+  let filas = datos.slice(2).filter(function(r){
+    return normalizarFecha(r[0]).length === 10;
+  });
+
+  if (fechaISO) filas = filas.filter(function(r){ return coincideFecha(r[0], fechaISO, fechaISOFin); });
+
+  if (termino) {
+    const tl = sinAcentos(termino);
+    filas = filas.filter(function(r) {
+      const sku = sinAcentos(String(r[1]||''));
+      const ref = sinAcentos(String(r[2]||''));
+      return sku.indexOf(tl)!==-1 || ref.indexOf(tl)!==-1 || (tl.length===4 && sku.slice(-4)===tl);
+    });
+  }
+
+  filas.sort(function(a,b){ return normalizarFecha(b[0]).localeCompare(normalizarFecha(a[0])); });
+
+  if (!filas.length) { await enviar(chatId, '😔 Sin entradas para los filtros indicados.'); return; }
+
+  let total = 0;
+  filas.forEach(function(r){ total += parseInt(String(r[3]||'0').replace(/,/g,''))||0; });
+
+  const top = filas.slice(0, MAX_RES);
+  let tg = '📦 <b>Entradas</b>'+(fechaLabel?' · '+fechaLabel:'')+(termino?' · '+esc(termino):'')+
+           '\n'+filas.length+' registros | Total: <b>'+total.toLocaleString()+'</b> pzs\n━━━━━━━━━━━━━━━━━\n\n';
+
+  top.forEach(function(r,i){
+    tg += (i+1)+'. <code>'+esc(String(r[1]||'-'))+'</code>\n'+
+          '   📅 '+normalizarFecha(r[0])+' | 📄 '+esc(String(r[2]||'-'))+' | 📦 <b>'+esc(String(r[3]||'0'))+'</b> pzs\n\n';
+  });
+
+  if (filas.length>MAX_RES) tg += '...y '+(filas.length-MAX_RES)+' más.';
+  await enviar(chatId, tg);
+}
+
+
+// ============================================================
+// MENÚ DE INTENTS CON BOTONES INLINE
+// ============================================================
+
+// Emojis por intent para hacer el menú más visual
+const INTENT_EMOJIS = {
+  saludo:'👋', identidad:'🤖', ayuda:'📋', despedida:'👋',
+  respuesta_afirmativa:'👍', respuesta_negativa:'🙅',
+  tiempo:'⏰', clima:'🌤️', chiste:'😄', estado_bot:'⚡',
+  error_usuario:'🔧', pregunta_general:'❓', insulto:'😅', elogio:'⭐',
+  trabajo:'💼', emergencia:'🚨', emocion_tristeza:'💙',
+  emocion_enojo:'😤', emocion_ansiedad:'😰', emocion_positivo:'😊',
+  existencial:'🌌', reflexion:'🪞', fallback:'🤔',
+  cultura_mx:'🇲🇽', fisica:'⚛️', quimica:'⚗️', matematicas:'📐',
+  conversiones:'🔄', clima_ciencia:'🌍',
+  bucay_lagrimas:'💙', bucay_felicidad:'💛', bucay_encuentros:'📚',
+  bucay_autodependencia:'🌱',
+  mayo_dolor_cabeza:'🤕', mayo_fiebre:'🌡️', mayo_gripe:'🤧',
+  mayo_infarto:'🚨', mayo_presion_alta:'❤️', mayo_diabetes:'💉',
+  mayo_fractura:'🦴', mayo_quemadura:'🔥', mayo_corte:'🩹',
+  mayo_convulsion:'🚨', mayo_desmayo:'😵', mayo_asfixia:'🚨',
+  mayo_rcp:'🫀', mayo_sangrado:'🩸', mayo_anafilaxia:'🚨',
+  mayo_alergia:'🌸', mayo_salud_mental:'🧠', mayo_sueno:'😴',
+  mayo_depresion:'💙', mayo_dolor_pecho:'🚨', mayo_golpe_calor:'☀️',
+  mayo_hipotermia:'🥶', mayo_deshidratacion:'💧', mayo_dolor_abdominal:'🫃',
+  mayo_apendicitis:'🚨', mayo_gastritis:'🫁', mayo_indigestion:'🍽️',
+  mayo_torcedura:'🦵', mayo_quimica:'⚗️', mayo_ojo:'👁️',
+  mayo_picadura:'🐝', mayo_mordedura:'🐕', mayo_presion_baja:'📉',
+  mayo_azucar_baja:'🍬', mayo_colesterol:'🫀', mayo_peso:'⚖️',
+  mayo_vacuna:'💉', mayo_sol:'☀️', mayo_ojo_rojo:'👁️',
+  mayo_acne:'🧴', mayo_tiroides:'🦋', mayo_vitamina_d:'☀️',
+  mayo_hierro:'💪', mayo_estres_cronico:'😮‍💨', mayo_colicos:'💊',
+  mayo_aliento:'🫁', mayo_orina_sangre:'🚨', mayo_infeccion_urinaria:'🦠',
+  mayo_dolor_espalda:'🦴', mayo_tos:'😷', mayo_tos_sangre:'🚨',
+  gita_mantra:'🕉️', meditacion:'🧘',
+  carreño_saludo:'🎩', carreño_presentacion:'🤝', carreño_mesa:'🍽️',
+  carreño_vestimenta:'👔', carreño_celular:'📱', carreño_puntualidad:'⏰',
+  carreño_redes_sociales:'📱', carreño_visita:'🏠', carreño_regalo:'🎁',
+  carreño_cena_negocios:'🍷', carreño_trabajo:'💼', carreño_email:'📧',
+  carreño_critica:'🎯', carreño_discusion:'🗣️', carreño_disculpa:'🙏',
+  carreño_quejas:'📢', carreño_escuchar:'👂', carreño_conversacion:'💬',
+  carreño_agradecimiento:'🙏', carreño_titulo:'🎩', carreño_reunion:'📋',
+  carreño_imagen:'💼', carreño_lenguaje_corporal:'🤸',
+  carreño_silencio:'🤫', carreño_chisme:'🤐', carreño_critica_constructiva:'📊',
+  carreño_palabras:'💬', carreño_alcohol:'🥂', carreño_conflicto:'🤝',
+  carreño_interrumpir:'🛑', carreño_pedir_favor:'🙏', carreño_limite:'🚧',
+  carreño_forma_vestir:'👔', carreño_funeral:'🕯️', carreño_boda:'💍',
+  carreño_lenguaje:'🗣️', carreño_quejas_servicio:'📢', carreño_halagos:'⭐',
+  carreño_curiosidad:'❓'
+};
+
+async function mostrarIntentsDeCat(chatId, cat) {
+  await cargarChatbotSiNecesario();
+
+  // Reconstruir mapa de intents
+  const intentMap = {};
+  chatbotCache.forEach(function(e) {
+    if (!intentMap[e.intent]) intentMap[e.intent] = 0;
+    intentMap[e.intent]++;
+  });
+  const todosIntents = Object.keys(intentMap).sort();
+
+  const categorias = {
+    '🤖 Bot': todosIntents.filter(i => ['saludo','identidad','ayuda','despedida','estado_bot','respuesta_afirmativa','respuesta_negativa','fallback','error_usuario','pregunta_general','insulto','elogio','chiste','tiempo','clima','trabajo'].includes(i)),
+    '🚨 Emergencias': todosIntents.filter(i => i === 'emergencia'),
+    '🏥 Salud (Mayo Clinic)': todosIntents.filter(i => i.startsWith('mayo_')),
+    '🎩 Etiqueta (Carreño)': todosIntents.filter(i => i.startsWith('carreño_')),
+    '🌌 Psicología': todosIntents.filter(i => ['existencial','reflexion','emocion_tristeza','emocion_enojo','emocion_ansiedad','emocion_positivo'].includes(i)),
+    '📚 Jorge Bucay': todosIntents.filter(i => i.startsWith('bucay_')),
+    '🇲🇽 Cultura Mexicana': todosIntents.filter(i => i === 'cultura_mx'),
+    '🔬 Ciencias': todosIntents.filter(i => ['fisica','quimica','matematicas','conversiones','clima_ciencia'].includes(i)),
+    '🕉️ Gita & Meditación': todosIntents.filter(i => ['gita_mantra','meditacion'].includes(i)),
+    'todos': todosIntents
+  };
+
+  const items = categorias[cat] || todosIntents;
+  const msg = (cat === 'todos' ? '📋 <b>Todos los intents</b>' : '<b>'+esc(cat)+'</b>')+'\nElige un tema:';
+
+  const keyboard = [];
+  items.forEach(function(intent) {
+    const emoji = INTENT_EMOJIS[intent] || '💬';
+    const count = intentMap[intent] || 0;
+    keyboard.push([{
+      text: emoji+' '+intent+' ('+count+')',
+      callback_data: 'intent:'+intent
+    }]);
+  });
+  keyboard.push([{ text: '⬅️ Volver al menú', callback_data: 'intent:__menu__' }]);
+
+  await enviarConBotones(chatId, msg, keyboard);
+}
+
+async function mostrarMenuIntents(chatId) {
+  await cargarChatbotSiNecesario();
+  if (!chatbotCache || !chatbotCache.length) {
+    await enviar(chatId, '❌ No se pudo cargar el menú. Intenta de nuevo en unos segundos.');
+    return;
+  }
+
+  // Obtener intents únicos con conteo
+  const intentMap = {};
+  chatbotCache.forEach(function(e) {
+    if (!intentMap[e.intent]) intentMap[e.intent] = 0;
+    intentMap[e.intent]++;
+  });
+
+  const intents = Object.keys(intentMap).sort();
+
+  // Agrupar visualmente por categoría
+  const categorias = {
+    '🤖 Bot': intents.filter(i => ['saludo','identidad','ayuda','despedida','estado_bot','respuesta_afirmativa','respuesta_negativa','fallback','error_usuario','pregunta_general','insulto','elogio','chiste','tiempo','clima','trabajo'].includes(i)),
+    '🚨 Emergencias': intents.filter(i => i === 'emergencia'),
+    '🏥 Salud (Mayo Clinic)': intents.filter(i => i.startsWith('mayo_')),
+    '🎩 Etiqueta (Carreño)': intents.filter(i => i.startsWith('carreño_')),
+    '🌌 Psicología': intents.filter(i => ['existencial','reflexion','emocion_tristeza','emocion_enojo','emocion_ansiedad','emocion_positivo'].includes(i)),
+    '📚 Jorge Bucay': intents.filter(i => i.startsWith('bucay_')),
+    '🇲🇽 Cultura Mexicana': intents.filter(i => i === 'cultura_mx'),
+    '🔬 Ciencias': intents.filter(i => ['fisica','quimica','matematicas','conversiones','clima_ciencia'].includes(i)),
+    '🕉️ Gita & Meditación': intents.filter(i => ['gita_mantra','meditacion'].includes(i))
+  };
+
+  let msg = '📋 <b>Menú del Bot</b>\n\nElige una categoría:';
+  const keyboard = [];
+
+  Object.entries(categorias).forEach(function([cat, items]) {
+    if (!items.length) return;
+    // Un botón por categoría — al tocarlo muestra los intents de esa categoría
+    keyboard.push([{ text: cat+' ('+items.length+')', callback_data: 'cat:'+cat }]);
+  });
+
+  keyboard.push([{ text: '🔍 Ver todos los intents', callback_data: 'cat:todos' }]);
+
+  await enviarConBotones(chatId, msg, keyboard);
+}
+
+async function mostrarFrasesIntent(chatId, intent) {
+  await cargarChatbotSiNecesario();
+  if (!chatbotCache) { await enviar(chatId, '❌ Sin datos del chatbot.'); return; }
+
+  const frases = chatbotCache
+    .filter(function(e){ return e.intent === intent; })
+    .map(function(e){ return e.frase; });
+
+  if (!frases.length) {
+    await enviar(chatId, '❓ Intent "'+esc(intent)+'" no encontrado.');
+    return;
+  }
+
+  const emoji = INTENT_EMOJIS[intent] || '💬';
+  let msg = emoji+' <b>'+esc(intent)+'</b>\nElige una opción:';
+
+  // Botones de 1 o 2 por fila según longitud
+  const keyboard = [];
+  const row = [];
+  frases.forEach(function(f, i) {
+    const btn = { text: f, callback_data: 'frase:'+f };
+    if (f.length > 25) {
+      if (row.length) { keyboard.push([...row]); row.length = 0; }
+      keyboard.push([btn]);
+    } else {
+      row.push(btn);
+      if (row.length === 2) { keyboard.push([...row]); row.length = 0; }
+    }
+  });
+  if (row.length) keyboard.push([...row]);
+  keyboard.push([{ text: '⬅️ Volver al menú', callback_data: 'intent:__menu__' }]);
+
+  await enviarConBotones(chatId, msg, keyboard);
+}
+
+async function esIntentChatbot(texto) {
+  await cargarChatbotSiNecesario();
+  if (!chatbotCache) return false;
+  const tl = sinAcentos(texto.trim());
+  return chatbotCache.some(function(e){ return e.intent === tl; });
+}
+
+async function cargarChatbotSiNecesario() {
+  const ahora = Date.now();
+  if (!chatbotCache || (ahora - chatbotCacheTs) > CHATBOT_TTL) {
+    const datos = await csv(ID_CHATBOT, CHATBOT_HOJA);
+    if (datos && datos.length > 1) {
+      chatbotCache = [];
+      datos.slice(1).forEach(function(r) {
+        const frases    = String(r[1]||'').split(',');
+        const respuesta = String(r[2]||'').trim();
+        const intent    = String(r[0]||'').trim();
+        if (!respuesta) return;
+        frases.forEach(function(frase) {
+          const f = frase.trim();
+          if (f) chatbotCache.push({ intent, frase: sinAcentos(f), frase_orig: f, respuesta });
+        });
+      });
+      chatbotCacheTs = ahora;
+      console.log('Chatbot cache: '+chatbotCache.length+' frases');
+    }
+  }
+}
+
+async function enviarConBotones(chatId, texto, keyboard) {
+  // App web: acumular en buffer (los botones se renderizan como links en HTML)
+  if (String(chatId).indexOf('web:') === 0) {
+    if (!_webBuffer.has(chatId)) _webBuffer.set(chatId, []);
+    // Convertir keyboard inline en lista de "comandos sugeridos" al pie del texto
+    let extra = '';
+    if (keyboard && keyboard.length) {
+      extra = '\n\n<i>Opciones:</i>\n';
+      keyboard.forEach(function(row){
+        row.forEach(function(btn){
+          const cmd = btn.callback_data || btn.text;
+          extra += '• <code>'+esc(btn.text)+'</code>\n';
+        });
+      });
+    }
+    _webBuffer.get(chatId).push(texto + extra);
+    return;
+  }
+  try {
+    await fetch(TELEGRAM_API+'/sendMessage', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: texto,
+        parse_mode: 'HTML',
+        reply_markup: { inline_keyboard: keyboard }
+      })
+    });
+  } catch(e) { console.error('enviarConBotones:', e.message); }
+}
+
+// ============================================================
+// CHATBOT — respuestas genéricas desde Sheet
+// ============================================================
+
+async function buscarChatbot(texto) {
+  try {
+    await cargarChatbotSiNecesario();
+    if (!chatbotCache || !chatbotCache.length) return null;
+
+    const tl = sinAcentos(texto.trim());
+
+    // 1. Coincidencia exacta
+    for (const entry of chatbotCache) {
+      if (tl === entry.frase) return entry.respuesta.replace(/\\n/g, '\n');
+    }
+
+    // 2. El texto del usuario CONTIENE la frase del Sheet
+    // (no al revés — evita que "acer" matchee "que puedes hacer")
+    // Solo si la frase del Sheet tiene al menos 4 caracteres
+    for (const entry of chatbotCache) {
+      if (entry.frase.length >= 4 && tl.indexOf(entry.frase) !== -1) {
+        return entry.respuesta.replace(/\\n/g, '\n');
+      }
+    }
+
+    return null;
+  } catch(e) {
+    console.error('buscarChatbot:', e.message);
+    return null;
+  }
+}
+
+// ============================================================
+// AYUDA
+// ============================================================
+
+async function ayuda(chatId, nombre) {
+  // Telegram tiene límite de 4096 chars por mensaje — enviamos en dos partes
+  await enviar(chatId,
+    '👋 Hola <b>'+esc(nombre)+'</b>! Soy el bot de Electronics México 📊\n\n'+
+
+    '<b>📦 INVENTARIO</b>\n'+
+    '<code>Samsung</code> · <code>Canon laptop</code> — búsqueda libre\n'+
+    '<code>stock mayor a 100</code> · <code>Samsung stock menor a 5</code>\n'+
+    '<code>sku HP-15FD0113DX-PLA-3027</code> — SKU exacto\n'+
+    '/stock — alerta stock bajo · /reporte — resumen general\n\n'+
+
+    '<b>💰 VENTAS POR CANAL</b>\n'+
+    '<code>venta walmart</code> · <code>venta sears</code> · <code>venta liverpool</code>\n'+
+    '<code>venta tiktok</code> · <code>venta ml</code> · <code>venta coppel</code>\n'+
+    '<code>venta walmart hoy</code> · <code>venta walmart 25/03/2026</code>\n'+
+    '<code>venta walmart, sears hoy</code> — múltiples canales\n'+
+    '<code>venta walmart 01/03 - 25/03/2026</code> — rango de fechas\n'+
+    '<code>venta 609107236567526</code> — busca SO en todos los canales\n\n'+
+
+    '<b>🏷️ PRECIOS</b>\n'+
+    '<code>precio HP</code> · <code>precio 2061</code> — por nombre o últimos 4 dígitos\n'+
+    '<code>precio Samsung walmart</code> — filtra por canal\n'+
+    '<code>precio Samsung walmart, liverpool</code> — múltiples canales\n'+
+    '<code>precio maximo Canon</code> · <code>precio minimo HP</code> · <code>precio concentrado Roku</code>\n\n'+
+
+    '<b>📦 ENTRADAS DE MERCANCÍA</b>\n'+
+    '<code>entradas</code> · <code>entradas hoy</code>\n'+
+    '<code>entradas CAN-EOS2000D</code> — por SKU\n'+
+    '<code>entradas 1859</code> — por últimos 4 dígitos\n'+
+    '<code>entradas P00323</code> — por referencia Odoo\n'+
+    '<code>entradas 01/03/2026 - 25/03/2026</code> — rango de fechas\n\n'+
+
+    '<b>⚠️ PRECIOS ERRÓNEOS</b>\n'+
+    '<code>precios erroneos</code> · <code>precios erroneos hoy</code>\n'+
+    '<code>precios erroneos Samsung 25/03/2026</code> — SKU + fecha\n\n'+
+
+    '<b>👤 VENDEDORES INCORRECTOS</b>\n'+
+    '<code>vendedores incorrectos</code> · <code>vendedores incorrectos hoy</code>\n'+
+    '<code>vendedores incorrectos Ventiapp</code> — por vendedor\n\n'+
+
+    '<b>🚨 SOBREVENTA</b>\n'+
+    '<code>sobreventa</code> · <code>sobreventa walmart</code> · <code>sobreventa ml</code>\n'+
+    '<code>sobreventa walmart, ml hoy</code> — múltiples + fecha\n\n'+
+
+    '<b>📥 POR RECIBIR</b>\n'+
+    '<code>por recibir</code> · <code>por recibir EMOLO</code>\n'+
+    '<code>por recibir P00498</code> — por documento\n'+
+    '<code>por recibir hoy</code>\n\n'+
+
+    '<b>🚛 TRASLADOS</b>\n'+
+    '<code>traslados hoy</code> · <code>traslados walmart hoy</code>\n'+
+    '<code>traslados pick28870</code> · <code>traslados pack30281</code> · <code>traslados out88304</code>\n'+
+    '<code>traslados S24527</code> — por número de SO\n'+
+    '<code>traslados rastreo 46726635598</code> — por guía de rastreo\n'+
+    '<code>traslados ml 01/03 - 25/03/2026</code> — canal + rango\n'
+  );
+
+  await enviar(chatId,
+    '<b>👥 CHECADOR DE ASISTENCIA</b> 🔒 <i>(requiere PIN)</i>\n\n'+
+
+    '📋 <b>Estatus del día:</b>\n'+
+    '<code>checador faltas hoy</code> · <code>checador faltas 25/03/2026</code>\n'+
+    '<code>checador faltas 23/03 - 25/03/2026</code> — rango\n'+
+    '<code>checador retardos hoy</code> · <code>checador puntual hoy</code>\n'+
+    '<code>checador vacaciones</code> · <code>checador enfermedades</code>\n'+
+    '<code>checador faltas Rodrigo, Eduardo hoy</code> — múltiples empleados\n\n'+
+
+    '📅 <b>Asistencia individual:</b>\n'+
+    '<code>asistencia Empleado</code> — historial completo\n'+
+    '<code>asistencia Empleado hoy</code> — entrada · salida · estatus\n'+
+    '<code>asistencia Empleado 01/03 - 25/03/2026</code> — rango\n'+
+    '<code>asistencia Rodrigo, Ximena hoy</code> — múltiples\n\n'+
+
+    '📊 <b>Resumen mensual:</b>\n'+
+    '<code>resumen Empleado</code> · <code>resumen Empleado marzo 2026</code>\n'+
+    '<code>resumen Rodrigo, Eduardo marzo 2026</code> — múltiples\n\n'+
+
+    '🔔 <b>Alertas:</b>\n'+
+    '<code>alertas</code> — todas · <code>alertas Empleado</code> — individual\n\n'+
+
+    '🏖️ <b>Vacaciones y enfermedades:</b>\n'+
+    '<code>vacaciones</code> · <code>vacaciones Empleado</code>\n'+
+    '<code>enfermedades</code> · <code>enfermedades Empleado</code>\n\n'+
+
+    '⏰ <b>Turnos y horarios:</b>\n'+
+    '<code>turno</code> — todos · <code>turno Empleado</code> — individual\n'+
+    '<code>turno Ximena, Carlos, Rodrigo</code> — múltiples\n\n'+
+
+    '━━━━━━━━━━━━━━━━━\n'+
+    '💡 <b>Reglas generales:</b>\n'+
+    '• <b>hoy</b> y <b>dd/mm/yyyy</b> funcionan en todos los módulos\n'+
+    '• <b>dd/mm/yyyy - dd/mm/yyyy</b> para rangos de fechas\n'+
+    '• Nombres sin acentos · sin mayúsculas obligatorias\n'+
+    '• Comas para múltiples términos: <code>turno Ximena, Carlos</code>\n\n'+
+    '/menu — explorar temas del chatbot con botones\n'+
+    '/miid — ver tu Chat ID'
+  );
+}
+
+
+// ============================================================
+// CLOUDFLARE AI — respuesta IA para preguntas no cubiertas
+// Incluido gratis en Cloudflare Workers — sin API key externa
+// ============================================================
+
+// ============================================================
+// CLOUDFLARE AI — con memoria de conversación
+// ============================================================
+
+function obtenerHistorial(chatId) {
+  const conv = conversaciones[chatId];
+  if (!conv) return [];
+  // Limpiar si expiró
+  if (Date.now() - conv.ts > CONV_TTL) {
+    delete conversaciones[chatId];
+    return [];
+  }
+  return conv.mensajes;
+}
+
+function guardarMensaje(chatId, role, content) {
+  if (!conversaciones[chatId]) {
+    conversaciones[chatId] = { ts: Date.now(), mensajes: [] };
+  }
+  conversaciones[chatId].ts = Date.now(); // resetear TTL
+  conversaciones[chatId].mensajes.push({ role, content });
+  // Mantener solo los últimos N mensajes
+  if (conversaciones[chatId].mensajes.length > CONV_MAX_MSG) {
+    conversaciones[chatId].mensajes = conversaciones[chatId].mensajes.slice(-CONV_MAX_MSG);
+  }
+}
+
+function limpiarHistorial(chatId) {
+  delete conversaciones[chatId];
+}
+
+async function preguntarGemini(chatId, pregunta, env) {
+  if (!env || !env.AI) return;
+
+  try {
+    await enviar(chatId, '🤖 Un momento...');
+
+    // Recuperar historial de la conversación
+    const historial = obtenerHistorial(chatId);
+
+    const messages = [
+      {
+        role: 'system',
+        content:
+          'Eres el asistente interno de Electronics México, una empresa de electrónica en México. '+
+          'Responde siempre en español mexicano · de forma concisa y amigable · máximo 3 párrafos. '+
+          'Mantén el hilo de la conversación — recuerda lo que se habló antes en este chat. '+
+          'Para matemáticas · ciencias · cultura general · emociones y preguntas generales responde directamente.'
+      },
+      ...historial,
+      { role: 'user', content: pregunta }
+    ];
+
+    const respuesta = await env.AI.run(CF_AI_MODEL, {
+      messages,
+      max_tokens: 400
+    });
+
+    const texto = respuesta?.response || '';
+    if (texto.trim()) {
+      // Guardar pregunta y respuesta en el historial
+      guardarMensaje(chatId, 'user', pregunta);
+      guardarMensaje(chatId, 'assistant', texto.trim());
+      await enviar(chatId, '🤖 '+texto.trim());
+    }
+
+  } catch(e) {
+    console.error('CF AI:', e.message);
+  }
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+
+async function csv(sheetId, sheetName) {
+  try {
+    // Cache-busting: timestamp único + headers no-cache
+    const ts = Date.now();
+    const url='https://docs.google.com/spreadsheets/d/'+sheetId+'/gviz/tq?tqx=out:csv&sheet='+encodeURIComponent(sheetName)+'&_='+ts;
+    const r=await fetch(url,{
+      signal: AbortSignal.timeout(10000),
+      cf: { cacheTtl: 0, cacheEverything: false },
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache'
+      }
+    });
+    if (!r.ok) throw new Error('HTTP '+r.status);
+    return parseCSV(await r.text());
+  } catch(e){console.error('csv ['+sheetName+']: '+e.message);return null;}
+}
+
+function parseCSV(text) {
+  return text.split('\n').map(function(line){
+    const cols=[]; let inQ=false,cur='';
+    for(let i=0;i<line.length;i++){
+      const c=line[i];
+      if(c==='"'){if(inQ&&line[i+1]==='"'){cur+='"';i++;}else inQ=!inQ;}
+      else if(c===','&&!inQ){cols.push(cur.trim());cur='';}
+      else cur+=c;
+    }
+    cols.push(cur.trim());
+    return cols;
+  }).filter(function(r){return r.length>1;});
+}
+
+// Extrae fecha o rango de fechas del texto
+// Soporta: "hoy", "25/03/2026", "23/03/2026 - 25/03/2026",
+//          "marzo", "marzo 2026", "primera quincena marzo", "segunda quincena marzo"
+// Devuelve {fechaISO, fechaISOFin, fechaLabel, resto}
+function extraerFecha(texto) {
+
+  // Helper: fecha MX en ISO dado un offset de días
+  function fechaMX(offsetDias) {
+    const now = new Date();
+    const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+    const mx  = new Date(utc + (-6 * 60 * 60000) + (offsetDias * 86400000));
+    const d   = String(mx.getDate()).padStart(2,'0');
+    const mo  = String(mx.getMonth()+1).padStart(2,'0');
+    const y   = mx.getFullYear().toString();
+    return { iso: y+'-'+mo+'-'+d, display: d+'/'+mo+'/'+y };
+  }
+
+  // Detectar "ayer - hoy" / "hoy - ayer" (rango)
+  if (/\bayer\s*[-–]\s*hoy\b|\bhoy\s*[-–]\s*ayer\b/i.test(texto)) {
+    const ayer = fechaMX(-1);
+    const hoy  = fechaMX(0);
+    return { fechaISO: ayer.iso, fechaISOFin: hoy.iso,
+             fechaLabel: ayer.display+' al '+hoy.display,
+             resto: texto.replace(/\b(ayer\s*[-–]\s*hoy|hoy\s*[-–]\s*ayer)\b/i,'').replace(/\s+/g,' ').trim() };
+  }
+
+  // Detectar "ayer"
+  if (/\bayer\b/i.test(texto)) {
+    const ayer = fechaMX(-1);
+    return { fechaISO: ayer.iso, fechaISOFin: null, fechaLabel: ayer.display,
+             resto: texto.replace(/\bayer\b/i,'').replace(/\s+/g,' ').trim() };
+  }
+
+  // Detectar "hoy"
+  if (/\bhoy\b/i.test(texto)) {
+    const hoy = fechaMX(0);
+    return { fechaISO: hoy.iso, fechaISOFin: null, fechaLabel: hoy.display,
+             resto: texto.replace(/\bhoy\b/i,'').replace(/\s+/g,' ').trim() };
+  }
+
+  // Detectar semanas: "siguiente semana" / "próxima semana" / "semana que viene"
+  //                    "esta semana" / "semana actual"
+  //                    "semana pasada" / "semana anterior"
+  // Calcula rango Lunes-Domingo de la semana indicada
+  const mSemana = texto.match(/\b(siguiente|proxima|próxima|esta|pasada|anterior)\s+semana\b|\bsemana\s+(que\s+viene|actual|pasada|anterior|siguiente|proxima|próxima)\b/i);
+  if (mSemana) {
+    const txtMatch = (mSemana[1] || mSemana[2] || '').toLowerCase();
+    // Determinar offset de semanas (-1, 0, +1)
+    let offsetSemanas = 0;
+    if (/(siguiente|proxima|próxima|que\s+viene)/i.test(txtMatch)) offsetSemanas = 1;
+    else if (/(pasada|anterior)/i.test(txtMatch)) offsetSemanas = -1;
+    // "esta" / "actual" → 0
+
+    // Calcular lunes de la semana objetivo
+    // getDay(): 0=Dom, 1=Lun, ..., 6=Sáb
+    const now = new Date();
+    const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+    const hoyMX = new Date(utc + (-6 * 60 * 60000));
+    const diaSemana = hoyMX.getDay();
+    // Días para llegar al lunes de ESTA semana: si es domingo (0), retroceder 6; si no, día-1
+    const diasAlLunes = (diaSemana === 0) ? -6 : (1 - diaSemana);
+    const lunes = fechaMX(diasAlLunes + (offsetSemanas * 7));
+    const domingo = fechaMX(diasAlLunes + (offsetSemanas * 7) + 6);
+    let labelPrefijo;
+    if (offsetSemanas === 1) labelPrefijo = 'Próxima semana';
+    else if (offsetSemanas === -1) labelPrefijo = 'Semana pasada';
+    else labelPrefijo = 'Esta semana';
+    return {
+      fechaISO: lunes.iso, fechaISOFin: domingo.iso,
+      fechaLabel: labelPrefijo+' ('+lunes.display+' al '+domingo.display+')',
+      resto: texto.replace(mSemana[0],'').replace(/\s+/g,' ').trim()
+    };
+  }
+
+  // Detectar mes relativo: "siguiente mes" / "próximo mes" / "mes que viene"
+  //                        "este mes" / "mes pasado" / "mes anterior"
+  const mMesRel = texto.match(/\b(siguiente|proximo|próximo|este|pasado|anterior)\s+mes\b|\bmes\s+(que\s+viene|actual|pasado|anterior|siguiente|proximo|próximo)\b/i);
+  if (mMesRel) {
+    const txtMatch = (mMesRel[1] || mMesRel[2] || '').toLowerCase();
+    let offsetMeses = 0;
+    if (/(siguiente|proximo|próximo|que\s+viene)/i.test(txtMatch)) offsetMeses = 1;
+    else if (/(pasado|anterior)/i.test(txtMatch)) offsetMeses = -1;
+
+    const now = new Date();
+    const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+    const hoyMX = new Date(utc + (-6 * 60 * 60000));
+    const target = new Date(hoyMX.getFullYear(), hoyMX.getMonth() + offsetMeses, 1);
+    const y  = target.getFullYear();
+    const mo = String(target.getMonth()+1).padStart(2,'0');
+    const lastDay = new Date(y, target.getMonth()+1, 0).getDate();
+    const ini = y+'-'+mo+'-01';
+    const fin = y+'-'+mo+'-'+String(lastDay).padStart(2,'0');
+    const mesNombres = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+    const label = mesNombres[target.getMonth()]+' '+y;
+    return {
+      fechaISO: ini, fechaISOFin: fin, fechaLabel: label,
+      resto: texto.replace(mMesRel[0],'').replace(/\s+/g,' ').trim()
+    };
+  }
+
+  // Detectar quincenas: "primera quincena marzo" / "segunda quincena marzo 2026"
+  const mQ = texto.match(/\b(primera|segunda)\s+quincena\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)(?:\s+(20\d{2}))?\b/i);
+  if (mQ) {
+    const q     = mQ[1].toLowerCase();
+    const mesNom= mQ[2].toLowerCase();
+    const meses = {enero:'01',febrero:'02',marzo:'03',abril:'04',mayo:'05',junio:'06',
+                   julio:'07',agosto:'08',septiembre:'09',octubre:'10',noviembre:'11',diciembre:'12'};
+    const mo  = meses[mesNom];
+    const y   = mQ[3] || new Date().getFullYear().toString();
+    const ini = q === 'primera' ? y+'-'+mo+'-01' : y+'-'+mo+'-16';
+    const lastDay = new Date(parseInt(y), parseInt(mo), 0).getDate();
+    const fin = q === 'primera' ? y+'-'+mo+'-15' : y+'-'+mo+'-'+lastDay;
+    const label = (q==='primera'?'1a':'2a')+' quincena '+mesNom+' '+y;
+    const resto = texto.replace(mQ[0],'').replace(/\s+/g,' ').trim();
+    return { fechaISO: ini, fechaISOFin: fin, fechaLabel: label, resto };
+  }
+
+  // Detectar mes por nombre: "marzo" / "marzo 2026"
+  const mMes = texto.match(/\b(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)(?:\s+(20\d{2}))?\b/i);
+  if (mMes) {
+    const mesNom = mMes[1].toLowerCase();
+    const meses  = {enero:'01',febrero:'02',marzo:'03',abril:'04',mayo:'05',junio:'06',
+                    julio:'07',agosto:'08',septiembre:'09',octubre:'10',noviembre:'11',diciembre:'12'};
+    const mo  = meses[mesNom];
+    const y   = mMes[2] || new Date().getFullYear().toString();
+    const lastDay = new Date(parseInt(y), parseInt(mo), 0).getDate();
+    const ini = y+'-'+mo+'-01';
+    const fin = y+'-'+mo+'-'+String(lastDay).padStart(2,'0');
+    const label = mesNom+' '+y;
+    const resto = texto.replace(mMes[0],'').replace(/\s+/g,' ').trim();
+    return { fechaISO: ini, fechaISOFin: fin, fechaLabel: label, resto };
+  }
+
+  // Detectar rango: "23/03/2026 - 25/03/2026" o "23/03/2026 al 25/03/2026"
+  const mRango = texto.match(
+    /(\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?)\s*(?:-{1,3}|al)\s*(\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?)/i
+  );
+  if (mRango) {
+    const f1 = parseFechaTexto(mRango[1]);
+    const f2 = parseFechaTexto(mRango[2]);
+    if (f1 && f2) {
+      const resto = texto.replace(mRango[0],'').replace(/\s+/g,' ').trim();
+      return { fechaISO: f1, fechaISOFin: f2,
+               fechaLabel: isoADisplay(f1)+' al '+isoADisplay(f2), resto };
+    }
+  }
+
+  // Fecha única
+  const m = texto.match(/(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/);
+  if (!m) return { fechaISO: null, fechaISOFin: null, fechaLabel: null, resto: texto };
+  const iso = parseFechaTexto(m[0]);
+  if (!iso) return { fechaISO: null, fechaISOFin: null, fechaLabel: null, resto: texto };
+  const resto = texto.replace(m[0],'').replace(/\s+/g,' ').trim();
+  return { fechaISO: iso, fechaISOFin: null, fechaLabel: isoADisplay(iso), resto };
+}
+
+// Convierte "25/03/2026" o "25/3/2026" a "2026-03-25"
+function parseFechaTexto(s) {
+  const m = String(s||'').match(/(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/);
+  if (!m) return null;
+  const d  = m[1].padStart(2,'0');
+  const mo = m[2].padStart(2,'0');
+  const y  = m[3] ? (m[3].length===2?'20'+m[3]:m[3]) : new Date().getFullYear().toString();
+  if (parseInt(mo)<1||parseInt(mo)>12) return null;
+  return y+'-'+mo+'-'+d;
+}
+
+// Convierte "2026-03-25" a "25/03/2026"
+function isoADisplay(iso) {
+  if (!iso) return '';
+  const p = iso.split('-');
+  return p[2]+'/'+p[1]+'/'+p[0];
+}
+
+// ── Normaliza cualquier formato de fecha a YYYY-MM-DD ─────────
+// Soporta:
+//   "23/3/2026 21:48:47"  → "2026-03-23"  (Histórico alertas, Vendedor incorrecto - DD/M/YYYY)
+//   "3/3/2026 15:14:14"   → "2026-03-03"  (mismo formato)
+//   "2026-03-19 21:04"    → "2026-03-19"  (Por recibir, Sobreventa - ISO con hora)
+//   "2026-03-22"          → "2026-03-22"  (Métricas diarias - ISO puro)
+//   "2026-03-25 10:30:00" → "2026-03-25"  (Canales de venta gviz CSV)
+function normalizarFecha(v) {
+  const s = String(v || '').trim();
+  if (!s) return '';
+
+  // Ya es YYYY-MM-DD (con o sin hora): "2026-03-19" / "2026-03-19 21:04"
+  const mISO = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (mISO) return mISO[1]+'-'+mISO[2]+'-'+mISO[3];
+
+  // Formato D/M/YYYY o DD/MM/YYYY con hora opcional: "23/3/2026 21:48:47"
+  // El primer número es el DÍA (formato mexicano)
+  const mMX = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (mMX) {
+    const dia = mMX[1].padStart(2,'0');
+    const mes = mMX[2].padStart(2,'0');
+    const anio = mMX[3];
+    // Validar que mes sea 1-12 (si no, probablemente está invertido)
+    if (parseInt(mes) >= 1 && parseInt(mes) <= 12) {
+      return anio+'-'+mes+'-'+dia;
+    }
+    // Si mes > 12, intentar invertir (caso borde)
+    return anio+'-'+dia+'-'+mes;
+  }
+
+  return s.substring(0, 10);
+}
+
+// Compara fecha de celda contra filtro — soporta fecha única y rango
+function coincideFecha(valorCelda, fechaISO, fechaISOFin) {
+  if (!fechaISO) return true;
+  const f = normalizarFecha(valorCelda);
+  if (!f) return false;
+  if (fechaISOFin) return f >= fechaISO && f <= fechaISOFin;
+  return f === fechaISO;
+}
+
+// ── Divide un texto en múltiples términos por coma o " y " ───
+// "Ximena, Carlos, Rodrigo" → ["Ximena","Carlos","Rodrigo"]
+// "walmart, ml" → ["walmart","ml"]
+// "Samsung" → ["Samsung"]  (un solo término, sin split)
+function splitTerminos(texto) {
+  if (!texto) return [texto];
+  // Separar por coma o " y " (con espacios)
+  const partes = texto.split(/\s*,\s*|\s+y\s+/i)
+    .map(function(p){ return p.trim(); })
+    .filter(function(p){ return p.length > 0; });
+  return partes.length > 0 ? partes : [texto];
+}
+
+function parsearConsulta(texto) {
+  let termino=texto,stockOp=null,stockVal=null;
+  const pat=/\bstock\s+(mayor\s+o\s+igual\s+a|menor\s+o\s+igual\s+a|mayor\s+a|menor\s+a|igual\s+a|>=|<=|>|<|=)\s*(\d+)/i;
+  const m=texto.match(pat);
+  if(m){
+    const op=m[1].trim().toLowerCase();
+    stockVal=parseInt(m[2]);
+    if(op==='mayor o igual a'||op==='>=')stockOp='gte';
+    else if(op==='mayor a'||op==='>')stockOp='gt';
+    else if(op==='menor o igual a'||op==='<=')stockOp='lte';
+    else if(op==='menor a'||op==='<')stockOp='lt';
+    else if(op==='igual a'||op==='=')stockOp='eq';
+    else stockOp='gt';
+    termino=texto.replace(pat,'').replace(/\bcon\b|\bde\b|\by\b/gi,' ').replace(/\s+/g,' ').trim();
+  }
+  return {termino,stockOp,stockVal};
+}
+
+function filtroStock(d,op,val){if(!op||val===null)return true;switch(op){case'gt':return d>val;case'gte':return d>=val;case'lt':return d<val;case'lte':return d<=val;case'eq':return d===val;}return true;}
+function buildLabel(t,op,val){const ops={gt:'mayor a',gte:'mayor o igual a',lt:'menor a',lte:'menor o igual a',eq:'igual a'};if(t&&op)return'"'+t+'" + stock '+(ops[op]||op)+' '+val;if(t)return'"'+t+'"';if(op)return'stock '+(ops[op]||op)+' '+val;return t;}
+function num(v){return parseInt(String(v||'0').replace(/,/g,'').replace(/\./g,''))||0;}
+function icon(d){return d<=0?'🔴':d<=5?'🟡':d<=20?'🟠':'🟢';}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+// ============================================================
+// ODOO XML-RPC — obtener ID de picking por su referencia
+// ============================================================
+
+function odooEsc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;');
+}
+function odooUnesc(s) {
+  return String(s).replace(/&lt;/g,'<').replace(/&gt;/g,'>')
+    .replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&amp;/g,'&');
+}
+
+function odooBuildXml(method, params) {
+  function xmlVal(v) {
+    if (v === null || v === undefined) return '<value><nil/></value>';
+    if (typeof v === 'boolean') return '<value><boolean>'+(v?1:0)+'</boolean></value>';
+    if (typeof v === 'number')
+      return Number.isInteger(v)
+        ? '<value><int>'+v+'</int></value>'
+        : '<value><double>'+v+'</double></value>';
+    if (typeof v === 'string') return '<value><string>'+odooEsc(v)+'</string></value>';
+    if (Array.isArray(v))
+      return '<value><array><data>'+v.map(xmlVal).join('')+'</data></array></value>';
+    if (typeof v === 'object')
+      return '<value><struct>'+Object.keys(v).map(function(k){
+        return '<member><name>'+odooEsc(k)+'</name>'+xmlVal(v[k])+'</member>';
+      }).join('')+'</struct></value>';
+    return '<value><string>'+odooEsc(String(v))+'</string></value>';
+  }
+  return '<?xml version="1.0"?><methodCall><methodName>'+odooEsc(method)+
+         '</methodName><params>'+params.map(function(p){return '<param>'+xmlVal(p)+'</param>';}).join('')+
+         '</params></methodCall>';
+}
+
+async function odooCall(endpoint, method, params) {
+  const url = ODOO.URL + '/xmlrpc/2/' + endpoint;
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/xml' },
+    body: odooBuildXml(method, params),
+    signal: AbortSignal.timeout(15000)
+  });
+  if (!r.ok) throw new Error('Odoo HTTP '+r.status);
+  return await r.text();
+}
+
+async function odooAuth() {
+  const xml = await odooCall('common', 'authenticate',
+    [ODOO.DB, ODOO.USER, ODOO.API_KEY, {}]);
+  const m = xml.match(/<(?:int|i4)>(\d+)<\/(?:int|i4)>/);
+  if (!m) throw new Error('Auth Odoo falló');
+  return parseInt(m[1], 10);
+}
+
+// Devuelve mapa { 'WH/PICK/39737': 397421, ... }
+async function odooGetPickingIds(referencias) {
+  if (!referencias.length) return {};
+  try {
+    const uid = await odooAuth();
+    const xml = await odooCall('object', 'execute_kw', [
+      ODOO.DB, uid, ODOO.API_KEY,
+      'stock.picking', 'search_read',
+      [[['name', 'in', referencias]]],
+      { fields: ['id', 'name'], limit: 500 }
+    ]);
+    const mapa = {};
+    const structs = xml.match(/<struct>[\s\S]*?<\/struct>/g) || [];
+    structs.forEach(function(s) {
+      const idM   = s.match(/<name>id<\/name>\s*<value>\s*<(?:int|i4)>(\d+)<\/(?:int|i4)>/);
+      const nameM = s.match(/<name>name<\/name>\s*<value>\s*<string>([^<]*)<\/string>/);
+      if (idM && nameM) mapa[odooUnesc(nameM[1])] = parseInt(idM[1], 10);
+    });
+    return mapa;
+  } catch(e) {
+    console.error('odooGetPickingIds:', e.message);
+    return {};
+  }
+}
+
+function odooPickingLink(id) {
+  return ODOO.URL + '/odoo/inventory/' + ODOO.WAREHOUSE + '/action-' + ODOO.ACTION + '/' + id;
+}
+
+// Elimina acentos para búsqueda sin importar tildes
+function sinAcentos(s) {
+  return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+}
+
+// Verifica si un valor contiene el término ignorando acentos (substring genérico)
+function contiene(valor, termino) {
+  return sinAcentos(valor).indexOf(sinAcentos(termino)) !== -1;
+}
+
+// Búsqueda de nombre de empleado: cada palabra del término debe ser
+// palabra completa en el nombre (evita "eric" → "erick")
+function contieneNombre(nombreCompleto, termino) {
+  const nombre = sinAcentos(String(nombreCompleto||''));
+  const palabrasBusqueda = sinAcentos(String(termino||'')).trim().split(/\s+/).filter(Boolean);
+  // Partir el nombre completo en palabras individuales
+  const palabrasNombre = nombre.split(/\s+/).filter(Boolean);
+  // Cada palabra buscada debe coincidir EXACTAMENTE con alguna palabra del nombre
+  // Esto evita que "eric" matchee "erick" (palabra completa, no prefijo)
+  return palabrasBusqueda.every(function(p) {
+    return palabrasNombre.some(function(pn) { return pn === p; });
+  });
+}
+function extractName(v){const s=String(v||'');const m=s.match(/,"([^"]+)"\)/);return m?m[1]:s.replace(/=IFERROR.*?,"/,'').replace(/"\)/,'').trim()||s;}
+
+// Buffer global para respuestas de la app web (clave = chatId 'web:UUID')
+// Cuando una petición llega a /api/query, genera un chatId único, llama al
+// router como si fuera Telegram, y al final lee este buffer para devolver JSON.
+const _webBuffer = new Map();
+
+async function enviar(chatId,texto){
+  // Si es petición de la app web, acumular en buffer y NO mandar a Telegram
+  if (String(chatId).indexOf('web:') === 0) {
+    if (!_webBuffer.has(chatId)) _webBuffer.set(chatId, []);
+    _webBuffer.get(chatId).push(texto);
+    return;
+  }
+  try{await fetch(TELEGRAM_API+'/sendMessage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:chatId,text:texto,parse_mode:'HTML'})});}
+  catch(e){console.error('enviar:',e.message);}
+}
+async function wa_send(chatId,msg){
+  const u=USUARIOS[chatId];
+  if(u){await callMeBot(u.tel,u.key,msg);}
+  else{await Promise.all(WHATSAPP.map(function(d){return callMeBot(d.tel,d.key,msg);}));}
+}
+async function callMeBot(tel,key,msg){
+  try{await fetch('https://api.callmebot.com/whatsapp.php?phone='+tel+'&text='+encodeURIComponent(msg)+'&apikey='+key);}
+  catch(e){console.error('callMeBot:',e.message);}
+}
