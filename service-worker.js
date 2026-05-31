@@ -11,7 +11,7 @@
  * para que los navegadores actualicen automáticamente.
  */
 
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const CACHE_NAME = 'bot-em-' + CACHE_VERSION;
 
 // Assets que se precachean al instalar
@@ -19,12 +19,12 @@ const PRECACHE_URLS = [
   './',
   './index.html',
   './manifest.webmanifest',
-  './icons/icon-192.png',
-  './icons/icon-512.png',
-  './icons/icon-192-maskable.png',
-  './icons/icon-512-maskable.png',
-  './icons/apple-touch-icon.png',
-  './icons/favicon-32.png'
+  './icon-192.png',
+  './icon-512.png',
+  './icon-192-maskable.png',
+  './icon-512-maskable.png',
+  './apple-touch-icon.png',
+  './favicon-32.png'
 ];
 
 // ── INSTALL: precachear assets ─────────────────────────────────
