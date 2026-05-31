@@ -694,6 +694,31 @@ body.girly-mode .pulse-indicator::before { background: #BA8FFF; }
 .filter-section { margin-bottom: 20px; }
 .filter-section:last-child { margin-bottom: 0; }
 
+/* Info box (modal sin filtros) */
+.info-box {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 14px 16px;
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-left: 3px solid var(--primary) !important;
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 1.55;
+}
+.info-box i {
+  color: var(--primary);
+  font-size: 18px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+body.girly-mode .info-box {
+  background: rgba(186, 143, 255, 0.08);
+  border-color: rgba(186, 143, 255, 0.25);
+  border-left-color: #BA8FFF !important;
+}
+body.girly-mode .info-box i { color: #BA8FFF; }
+
 .filter-label {
   display: flex; align-items: center; gap: 8px;
   font-size: 13px; font-weight: 700;
@@ -1050,11 +1075,11 @@ body.girly-mode .typing span { background: #BA8FFF; }
           <i class="fas fa-chart-line"></i>
           <span>Ventas</span>
         </div>
-        <div class="nav-item" onclick="sendMessage('sobreventa')">
+        <div class="nav-item" onclick="abrirFiltros('sobreventa')">
           <i class="fas fa-triangle-exclamation"></i>
           <span>Sobreventa</span>
         </div>
-        <div class="nav-item" onclick="sendMessage('por recibir')">
+        <div class="nav-item" onclick="abrirFiltros('porRecibir')">
           <i class="fas fa-truck"></i>
           <span>Por recibir</span>
         </div>
@@ -1070,11 +1095,11 @@ body.girly-mode .typing span { background: #BA8FFF; }
           <i class="fas fa-fingerprint"></i>
           <span>Asistencia</span>
         </div>
-        <div class="nav-item" onclick="sendMessage('bono puntualidad')">
+        <div class="nav-item" onclick="abrirFiltros('bono')">
           <i class="fas fa-trophy"></i>
           <span>Bono</span>
         </div>
-        <div class="nav-item" onclick="sendMessage('retardos')">
+        <div class="nav-item" onclick="abrirFiltros('retardos')">
           <i class="fas fa-clock"></i>
           <span>Retardos</span>
         </div>
@@ -1114,7 +1139,7 @@ body.girly-mode .typing span { background: #BA8FFF; }
           <i class="fas fa-store"></i>
           <span>Ventiapp</span>
         </div>
-        <div class="nav-item" onclick="sendMessage('killers')">
+        <div class="nav-item" onclick="abrirFiltros('killers')">
           <i class="fas fa-bullseye"></i>
           <span>Killers</span>
         </div>
@@ -1232,6 +1257,14 @@ body.girly-mode .typing span { background: #BA8FFF; }
 
     <div class="modal-body">
 
+      <!-- Sección informativa (para comandos sin filtros, solo confirmación) -->
+      <div class="filter-section" id="seccion-info">
+        <div class="info-box">
+          <i class="fas fa-info-circle"></i>
+          <span id="info-texto"></span>
+        </div>
+      </div>
+
       <!-- Sección de fechas -->
       <div class="filter-section" id="seccion-fechas">
         <label class="filter-label">
@@ -1311,11 +1344,27 @@ const SESSION_ID = (function() {
 })();
 
 /* ============================================================
-   CONFIGURACIÓN DE COMANDOS DEL SIDEBAR — qué filtros muestra cada uno
-   y cómo se arma el comando final que se manda al bot.
+   CONFIGURACIÓN DE COMANDOS DEL SIDEBAR
+   ============================================================
+   Reglas críticas para construir comandos válidos:
+   - Cuando hay RANGO de fechas: usar separador " al " ("01/05/2026 al 31/05/2026").
+     El bot solo detecta rango con "al" o "-", NUNCA con espacio simple.
+   - Cuando hay solo UNA fecha: pasarla sola.
+   - El nombre del empleado va ANTES de la fecha (el bot extrae la fecha primero
+     y el resto lo trata como nombre).
+   - Formato fecha: DD/MM/YYYY (es lo que parseFechaTexto del bot espera).
    ============================================================ */
+
+function fmtPeriodo(f) {
+  // Devuelve la parte del periodo lista para concatenar al comando.
+  // Si las dos fechas son iguales → "DD/MM/YYYY" (única). Si son distintas → "DD/MM/YYYY al DD/MM/YYYY".
+  if (!f.fechaIni || !f.fechaFin) return '';
+  if (f.fechaIni === f.fechaFin) return f.fechaIni;
+  return f.fechaIni + ' al ' + f.fechaFin;
+}
+
 const COMANDOS = {
-  // Inventario
+  // ============== INVENTARIO ==============
   stock: {
     titulo: 'Stock',
     icono: 'fa-boxes-stacked',
@@ -1326,78 +1375,145 @@ const COMANDOS = {
   ventas: {
     titulo: 'Ventas',
     icono: 'fa-chart-line',
-    filtros: { fechas: true },
-    build: f => 'venta ' + f.fechaIni + ' ' + f.fechaFin
+    filtros: { fechas: true, sku: true, skuOpcional: true, skuLabel: 'Canal o SO (opcional)',
+               skuHint: 'Ej: <code>walmart</code>, <code>amazon</code>, <code>S00123</code>' },
+    build: f => {
+      const parts = ['venta'];
+      if (f.sku) parts.push(f.sku);
+      const p = fmtPeriodo(f);
+      if (p) parts.push(p);
+      return parts.join(' ');
+    }
+  },
+  sobreventa: {
+    titulo: 'Sobreventa',
+    icono: 'fa-triangle-exclamation',
+    filtros: { sku: true, skuOpcional: true, skuLabel: 'SKU o cliente (opcional)' },
+    build: f => 'sobreventa' + (f.sku ? ' ' + f.sku : '')
+  },
+  porRecibir: {
+    titulo: 'Por recibir',
+    icono: 'fa-truck',
+    filtros: { sku: true, skuOpcional: true, skuLabel: 'SKU o proveedor (opcional)' },
+    build: f => 'por recibir' + (f.sku ? ' ' + f.sku : '')
   },
   traslados: {
     titulo: 'Traslados',
     icono: 'fa-arrow-right-arrow-left',
-    filtros: { fechas: true },
-    build: f => 'traslados ' + f.fechaIni + ' ' + f.fechaFin
+    filtros: { fechas: true, sku: true, skuOpcional: true, skuLabel: 'Canal/SO (opcional)' },
+    build: f => {
+      const parts = ['traslados'];
+      if (f.sku) parts.push(f.sku);
+      const p = fmtPeriodo(f);
+      if (p) parts.push(p);
+      return parts.join(' ');
+    }
   },
 
-  // Checador
+  // ============== CHECADOR ==============
   asistencia: {
     titulo: 'Asistencia',
     icono: 'fa-fingerprint',
-    filtros: { fechas: true, empleado: true },
+    filtros: { fechas: true, empleado: true, empleadoOpcional: true },
     build: f => {
-      const base = f.empleado ? ('asistencia ' + f.empleado) : 'checador';
-      return base + ' ' + f.fechaIni + ' ' + f.fechaFin;
+      // Si NO se eligió empleado: usar comando "checador" que da reporte global
+      // Si SÍ se eligió: usar "asistencia <empleado> <fecha>" (el bot extrae fecha primero,
+      //                  el resto es el nombre)
+      const cmd = f.empleado ? ('asistencia ' + f.empleado) : 'checador';
+      const p = fmtPeriodo(f);
+      return p ? (cmd + ' ' + p) : cmd;
     }
+  },
+  bono: {
+    titulo: 'Bono de puntualidad',
+    icono: 'fa-trophy',
+    filtros: {}, // sin filtros — el bot lo calcula por todo el periodo cargado
+    build: () => 'bono puntualidad'
+  },
+  retardos: {
+    titulo: 'Retardos',
+    icono: 'fa-clock',
+    filtros: {}, // sin filtros — por quincena automático
+    build: () => 'retardos'
   },
   faltas: {
     titulo: 'Faltas',
     icono: 'fa-user-times',
-    filtros: { fechas: true },
-    build: f => 'faltas ' + f.fechaIni + ' ' + f.fechaFin
+    filtros: { fechas: true, empleado: true, empleadoOpcional: true },
+    build: f => {
+      const parts = ['faltas'];
+      if (f.empleado) parts.push(f.empleado);
+      const p = fmtPeriodo(f);
+      if (p) parts.push(p);
+      return parts.join(' ');
+    }
   },
   vacaciones: {
     titulo: 'Vacaciones',
     icono: 'fa-umbrella-beach',
-    filtros: { empleado: true, fechas: true },
+    filtros: { fechas: true, empleado: true, empleadoOpcional: true,
+               fechasOpcional: true },
     build: f => {
-      const base = f.empleado ? ('vacaciones ' + f.empleado) : 'vacaciones';
-      return base + ' ' + f.fechaIni + ' ' + f.fechaFin;
+      const parts = ['vacaciones'];
+      if (f.empleado) parts.push(f.empleado);
+      const p = fmtPeriodo(f);
+      if (p) parts.push(p);
+      return parts.join(' ');
     }
   },
   enfermedades: {
     titulo: 'Enfermedades',
     icono: 'fa-notes-medical',
-    filtros: { empleado: true, fechas: true },
+    filtros: { fechas: true, empleado: true, empleadoOpcional: true,
+               fechasOpcional: true },
     build: f => {
-      const base = f.empleado ? ('enfermedades ' + f.empleado) : 'enfermedades';
-      return base + ' ' + f.fechaIni + ' ' + f.fechaFin;
+      const parts = ['enfermedades'];
+      if (f.empleado) parts.push(f.empleado);
+      const p = fmtPeriodo(f);
+      if (p) parts.push(p);
+      return parts.join(' ');
     }
   },
   gym: {
     titulo: 'Gym',
     icono: 'fa-dumbbell',
-    filtros: { empleado: true },
+    filtros: { empleado: true, empleadoOpcional: true },
     build: f => f.empleado ? ('gym ' + f.empleado) : 'gym'
   },
 
-  // Precios
+  // ============== PRECIOS ==============
   preciosErroneos: {
     titulo: 'Precios erróneos',
     icono: 'fa-circle-exclamation',
-    filtros: { fechas: true },
-    build: f => 'precios erroneos ' + f.fechaIni + ' ' + f.fechaFin
+    filtros: { fechas: true, fechasOpcional: true },
+    build: f => {
+      const p = fmtPeriodo(f);
+      return p ? ('precios erroneos ' + p) : 'precios erroneos';
+    }
   },
   vendedoresIncorrectos: {
     titulo: 'Vendedores incorrectos',
     icono: 'fa-user-tag',
-    filtros: { fechas: true },
-    build: f => 'vendedores incorrectos ' + f.fechaIni + ' ' + f.fechaFin
+    filtros: { fechas: true, fechasOpcional: true },
+    build: f => {
+      const p = fmtPeriodo(f);
+      return p ? ('vendedores incorrectos ' + p) : 'vendedores incorrectos';
+    }
   },
 
-  // Marketplaces
+  // ============== MARKETPLACES ==============
   ventiapp: {
     titulo: 'Ventiapp',
     icono: 'fa-store',
     filtros: { sku: true },
     build: f => 'ventiapp ' + (f.sku || '').trim(),
     requiere: ['sku']
+  },
+  killers: {
+    titulo: 'Killers',
+    icono: 'fa-bullseye',
+    filtros: { sku: true, skuOpcional: true, skuLabel: 'SKU o filtro (opcional)' },
+    build: f => 'killers' + (f.sku ? ' ' + f.sku : '')
   }
 };
 
@@ -1526,17 +1642,52 @@ async function abrirFiltros(comandoId) {
   const showFechas   = !!cfg.filtros.fechas;
   const showEmpleado = !!cfg.filtros.empleado;
   const showSku      = !!cfg.filtros.sku;
+  const sinFiltros   = !showFechas && !showEmpleado && !showSku;
 
   document.getElementById('seccion-fechas').style.display   = showFechas   ? '' : 'none';
   document.getElementById('seccion-empleado').style.display = showEmpleado ? '' : 'none';
   document.getElementById('seccion-sku').style.display      = showSku      ? '' : 'none';
 
+  // Banner "sin filtros" cuando no hay nada que filtrar (bono/retardos)
+  const seccionInfo = document.getElementById('seccion-info');
+  if (seccionInfo) {
+    if (sinFiltros) {
+      seccionInfo.style.display = '';
+      const infoTexto = document.getElementById('info-texto');
+      if (infoTexto) infoTexto.textContent =
+        'Esta consulta no requiere filtros. Trae el periodo completo cargado en el sistema.';
+    } else {
+      seccionInfo.style.display = 'none';
+    }
+  }
+
   // Prefill fechas con MES ACTUAL si aplica
   if (showFechas) aplicarQuickDate('este-mes');
 
-  // Limpiar empleado y sku
-  if (showEmpleado) document.getElementById('empleado-input').value = '';
-  if (showSku)      document.getElementById('sku-input').value = '';
+  // Limpiar empleado
+  if (showEmpleado) {
+    document.getElementById('empleado-input').value = '';
+    const labelEl = document.querySelector('#seccion-empleado .filter-label span');
+    if (labelEl) labelEl.textContent = cfg.filtros.empleadoOpcional
+      ? 'Empleado (opcional)' : 'Empleado';
+  }
+
+  // SKU con label personalizado
+  if (showSku) {
+    document.getElementById('sku-input').value = '';
+    const labelEl = document.querySelector('#seccion-sku .filter-label span');
+    if (labelEl) labelEl.textContent = cfg.filtros.skuLabel || 'Búsqueda';
+    const hintEl = document.querySelector('#seccion-sku .filter-hint');
+    if (hintEl) hintEl.innerHTML = cfg.filtros.skuHint ||
+      'Ej: <code>4699</code>, <code>AMA-</code>, <code>walmart</code>';
+  }
+
+  // Label de fechas (opcional vs obligatorio)
+  if (showFechas) {
+    const labelEl = document.querySelector('#seccion-fechas .filter-label span');
+    if (labelEl) labelEl.textContent = cfg.filtros.fechasOpcional
+      ? 'Periodo (opcional)' : 'Periodo';
+  }
 
   // Si necesita empleado, asegurar que la lista esté cargada
   if (showEmpleado) {
@@ -1546,7 +1697,7 @@ async function abrirFiltros(comandoId) {
       const dl = document.getElementById('empleados-dl');
       dl.innerHTML = emps.map(n => '<option value="'+n.replace(/"/g,'&quot;')+'">').join('');
       hint.textContent = emps.length
-        ? emps.length + ' empleados disponibles · escribe para buscar'
+        ? emps.length + ' empleados · escribe para buscar (déjalo vacío para todos)'
         : '(no se pudo cargar la lista)';
     });
   }
@@ -1577,22 +1728,25 @@ function consultarConFiltros() {
   const cfg = COMANDOS[_comandoActivo];
   if (!cfg) return;
 
-  // Recolectar valores
   const filtros = {};
 
+  // FECHAS — solo recolectar si la sección está visible
   if (cfg.filtros.fechas) {
     const ini = document.getElementById('fecha-ini').value;
     const fin = document.getElementById('fecha-fin').value;
-    if (!ini || !fin) {
+    const obligatorio = !cfg.filtros.fechasOpcional;
+
+    if (ini && fin) {
+      if (ini > fin) {
+        alert('La fecha "Desde" no puede ser mayor que "Hasta".');
+        return;
+      }
+      filtros.fechaIni = fechaDDMM(ini);
+      filtros.fechaFin = fechaDDMM(fin);
+    } else if (obligatorio) {
       alert('Selecciona el periodo de fechas.');
       return;
     }
-    if (ini > fin) {
-      alert('La fecha "Desde" no puede ser mayor que "Hasta".');
-      return;
-    }
-    filtros.fechaIni = fechaDDMM(ini);
-    filtros.fechaFin = fechaDDMM(fin);
   }
 
   if (cfg.filtros.empleado) {
