@@ -12,10 +12,39 @@
 <meta name="apple-mobile-web-app-title" content="Bot EM">
 
 <title>Bot - Electronics México</title>
+
+<!-- PWA: instalable como app nativa -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🤖%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
       crossorigin="anonymous" referrerpolicy="no-referrer">
+
+<!-- Registro del Service Worker — habilita instalación y modo offline -->
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function() {
+      navigator.serviceWorker.register('service-worker.js')
+        .then(function(reg) {
+          console.log('✅ Service Worker registrado:', reg.scope);
+          reg.addEventListener('updatefound', function() {
+            const sw = reg.installing;
+            if (sw) sw.addEventListener('statechange', function() {
+              if (sw.state === 'installed' && navigator.serviceWorker.controller) {
+                console.log('🔄 Nueva versión disponible — recarga para aplicar');
+              }
+            });
+          });
+        })
+        .catch(function(err) {
+          console.warn('⚠️ Service Worker no se pudo registrar:', err);
+        });
+    });
+  }
+</script>
 
 <style>
 /* ============================================================
@@ -195,6 +224,37 @@ body.girly-mode .logo-img {
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
 }
 .topbar-btn.small { padding: 10px; font-size: 13px; }
+
+/* Botón Instalar PWA */
+.install-btn {
+  width: 100%;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  background: linear-gradient(135deg, var(--success), #059669);
+  border: none !important;
+  border-radius: 8px;
+  color: white;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: all 0.3s;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif !important;
+}
+.install-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+.install-btn i { font-size: 16px; }
+body.girly-mode .install-btn {
+  background: linear-gradient(135deg, #BA8FFF, #DB7093);
+}
+body.girly-mode .install-btn:hover {
+  box-shadow: 0 4px 12px rgba(186, 143, 255, 0.5);
+}
 
 /* Live time indicator */
 .live-indicator {
@@ -718,6 +778,12 @@ body.girly-mode .typing span { background: #BA8FFF; }
       </button>
     </div>
 
+    <!-- Botón Instalar (aparece solo si el navegador lo soporta) -->
+    <button id="btn-instalar" class="install-btn" onclick="instalarApp()" style="display:none;">
+      <i class="fas fa-download"></i>
+      <span>Instalar App</span>
+    </button>
+
     <!-- Indicador en vivo -->
     <div class="live-indicator">
       <div class="pulse-indicator"></div>
@@ -937,8 +1003,62 @@ const SESSION_ID = (function() {
 })();
 
 /* ============================================================
-   PARTÍCULAS DE FONDO (igual que intranet)
+   PWA: BOTÓN INSTALAR
    ============================================================ */
+let deferredInstallPrompt = null;
+const btnInstalar = document.getElementById('btn-instalar');
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  // Chrome dispara este evento cuando la app es instalable
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  if (btnInstalar) btnInstalar.style.display = 'flex';
+});
+
+function instalarApp() {
+  if (!deferredInstallPrompt) {
+    // Fallback: explicar manualmente (iOS / Safari no soporta beforeinstallprompt)
+    alert('Para instalar:\n\n📱 iPhone/iPad (Safari): toca el botón Compartir y luego "Añadir a pantalla de inicio"\n\n💻 Chrome/Edge: busca el ícono ⊕ en la barra de direcciones\n\n📲 Android: menú ⋮ → "Instalar aplicación"');
+    return;
+  }
+  deferredInstallPrompt.prompt();
+  deferredInstallPrompt.userChoice.then((choice) => {
+    if (choice.outcome === 'accepted') {
+      console.log('✅ App instalada');
+      if (btnInstalar) btnInstalar.style.display = 'none';
+    }
+    deferredInstallPrompt = null;
+  });
+}
+
+// En iOS Safari no existe beforeinstallprompt; mostramos el botón siempre que
+// la página NO esté corriendo ya como standalone (es decir, no está instalada)
+const esIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+const yaInstalada = window.matchMedia('(display-mode: standalone)').matches ||
+                    window.navigator.standalone === true;
+if (esIOS && !yaInstalada && btnInstalar) {
+  btnInstalar.style.display = 'flex';
+}
+
+// Si se acaba de instalar, ocultar el botón
+window.addEventListener('appinstalled', () => {
+  if (btnInstalar) btnInstalar.style.display = 'none';
+  deferredInstallPrompt = null;
+});
+
+/* ============================================================
+   SHORTCUTS DEL MANIFEST — ?q=... ejecuta el comando al cargar
+   ============================================================ */
+function procesarQueryParam() {
+  const params = new URLSearchParams(window.location.search);
+  const q = params.get('q');
+  if (q && q.trim()) {
+    // Esperar a que el chat esté listo
+    setTimeout(() => sendMessage(q.trim()), 300);
+    // Limpiar la URL para que no se repita al recargar
+    history.replaceState({}, '', window.location.pathname);
+  }
+}
 function generarParticulas() {
   const container = document.getElementById('particles');
   if (!container) return;
@@ -1170,6 +1290,7 @@ window.addEventListener('load', () => {
   aplicarGirlyGuardado();
   actualizarReloj();
   setInterval(actualizarReloj, 1000);
+  procesarQueryParam();
   if (window.innerWidth > 768) messageInput.focus();
 });
 </script>
