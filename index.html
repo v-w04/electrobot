@@ -1,0 +1,1178 @@
+<!DOCTYPE html>
+<html lang="es" translate="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="google" content="notranslate">
+<meta name="theme-color" content="#0F1A2E">
+<meta name="application-name" content="Bot EM">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Bot EM">
+
+<title>Bot - Electronics México</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🤖%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+      crossorigin="anonymous" referrerpolicy="no-referrer">
+
+<style>
+/* ============================================================
+   SISTEMA DE DISEÑO — clavado a Styles.css de la intranet
+   ============================================================ */
+:root {
+  --primary: #3B82F6;
+  --primary-dark: #2563EB;
+  --secondary: #06B6D4;
+  --success: #10B981;
+  --warning: #F59E0B;
+  --danger: #EF4444;
+  --bg-primary: #0F172A;
+  --bg-secondary: #1E293B;
+  --bg-tertiary: #334155;
+  --text-primary: #F1F5F9;
+  --text-secondary: #94A3B8;
+  --border-color: #334155;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+*, *::before, *::after { box-sizing: border-box; }
+
+*:not(.fa):not(.fas):not(.far):not(.fab):not(.fal):not([class*="fa-"]),
+*:not(.fa):not(.fas):not(.far):not(.fab):not(.fal):not([class*="fa-"])::before,
+*:not(.fa):not(.fas):not(.far):not(.fab):not(.fal):not([class*="fa-"])::after {
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif !important;
+}
+.fa, .fas, .far, .fab, .fal, [class*="fa-"] {
+  font-family: 'Font Awesome 6 Free' !important;
+}
+.fa, .fas, [class*="fa-"] { font-weight: 900 !important; }
+
+html { background: #0F172A; min-height: 100vh; }
+body {
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif !important;
+  background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%) !important;
+  background-attachment: fixed !important;
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ============================================================
+   PARTÍCULAS FLOTANTES
+   ============================================================ */
+#particles {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  pointer-events: none; z-index: 0;
+}
+.particle {
+  position: absolute; width: 3px; height: 3px;
+  background: rgba(59, 130, 246, 0.8);
+  border-radius: 50%;
+  box-shadow: 0 0 6px rgba(59, 130, 246, 0.8);
+  will-change: transform, opacity; transform: translateZ(0);
+}
+@keyframes floatOrganic1 {
+  0% { transform: translate(0, 100vh) scale(0); opacity: 0; }
+  5% { opacity: 1; transform: translate(0, 95vh) scale(1); }
+  25% { transform: translate(15px, 70vh) scale(1.1); }
+  50% { transform: translate(-20px, 45vh) scale(0.9); }
+  75% { transform: translate(30px, 20vh) scale(1.2); }
+  95% { opacity: 1; transform: translate(10px, 5vh) scale(1); }
+  100% { transform: translate(0, 0) scale(0); opacity: 0; }
+}
+@keyframes floatOrganic2 {
+  0% { transform: translate(0, 100vh) scale(0) rotate(0deg); opacity: 0; }
+  5% { opacity: 1; transform: translate(0, 95vh) scale(1) rotate(45deg); }
+  30% { transform: translate(-25px, 65vh) scale(1.2) rotate(120deg); }
+  60% { transform: translate(40px, 35vh) scale(0.8) rotate(240deg); }
+  85% { transform: translate(-15px, 10vh) scale(1.1) rotate(320deg); }
+  95% { opacity: 1; transform: translate(5px, 3vh) scale(1) rotate(360deg); }
+  100% { transform: translate(0, 0) scale(0) rotate(360deg); opacity: 0; }
+}
+@keyframes floatOrganic3 {
+  0% { transform: translate(0, 100vh) scale(0); opacity: 0; }
+  8% { opacity: 1; transform: translate(0, 92vh) scale(1); }
+  35% { transform: translate(35px, 60vh) scale(0.9); }
+  55% { transform: translate(-30px, 40vh) scale(1.3); }
+  80% { transform: translate(20px, 15vh) scale(0.95); }
+  95% { opacity: 1; transform: translate(-5px, 5vh) scale(1); }
+  100% { transform: translate(0, 0) scale(0); opacity: 0; }
+}
+
+/* ============================================================
+   SCROLLBAR GLOBAL
+   ============================================================ */
+*::-webkit-scrollbar { width: 6px; height: 6px; }
+*::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.5); border-radius: 3px; }
+*::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #3B82F6, #06B6D4); border-radius: 3px; }
+*::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #2563EB, #0284C7); }
+* { scrollbar-width: thin; scrollbar-color: #3B82F6 rgba(15, 23, 42, 0.5); }
+
+/* ============================================================
+   LAYOUT — sidebar + main content (idéntico a intranet)
+   ============================================================ */
+.app-container {
+  display: flex; height: 100vh; position: relative; z-index: 1; overflow: visible;
+}
+
+.sidebar {
+  width: 280px;
+  background: rgba(15, 23, 42, 0.98);
+  border-right: 1px solid rgba(59, 130, 246, 0.3);
+  padding: 24px;
+  overflow-y: auto; overflow-x: hidden;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  height: 100vh; max-height: 100vh;
+  position: fixed; top: 0; left: 0; z-index: 200;
+  backdrop-filter: blur(20px);
+  box-shadow: 4px 0 20px rgba(0, 0, 0, 0.3);
+}
+.sidebar::-webkit-scrollbar { width: 6px; }
+.sidebar::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.5); }
+.sidebar::-webkit-scrollbar-thumb { background: rgba(59, 130, 246, 0.5); border-radius: 3px; }
+
+/* Logo */
+.logo-container {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 32px; padding-bottom: 24px;
+  border-bottom: 1px solid var(--border-color) !important;
+}
+.logo-img {
+  width: 48px; height: 48px; border-radius: 50%; object-fit: cover;
+  border: 2px solid var(--primary) !important;
+  cursor: pointer; transition: opacity 0.2s;
+  animation: logoBreathing 5s ease-in-out infinite;
+}
+.logo-img:hover { opacity: 0.8; animation-play-state: paused; }
+@keyframes logoBreathing {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(59, 130, 246, 0.4), 0 0 16px rgba(59, 130, 246, 0.2);
+    border-color: rgba(59, 130, 246, 0.8); transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(59, 130, 246, 0.6), 0 0 32px rgba(59, 130, 246, 0.3), 0 0 48px rgba(59, 130, 246, 0.1);
+    border-color: rgba(59, 130, 246, 1); transform: scale(1.05);
+  }
+}
+body.girly-mode .logo-img {
+  border-color: #BA8FFF !important;
+  animation: logoBreathingGirly 5s ease-in-out infinite;
+}
+@keyframes logoBreathingGirly {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(186, 143, 255, 0.4), 0 0 16px rgba(186, 143, 255, 0.2);
+    border-color: rgba(186, 143, 255, 0.8); transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(186, 143, 255, 0.6), 0 0 32px rgba(186, 143, 255, 0.3), 0 0 48px rgba(219, 112, 147, 0.2);
+    border-color: rgba(186, 143, 255, 1); transform: scale(1.05);
+  }
+}
+.logo-text h1 { font-size: 18px; font-weight: 700; color: var(--text-primary); }
+.logo-text p  { font-size: 12px; color: var(--text-secondary); }
+
+/* Botones del sidebar (mismo patrón que topbar-btn de la intranet) */
+.sidebar-controls {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+  margin-bottom: 20px; padding-bottom: 20px;
+  border-bottom: 1px solid var(--border-color);
+}
+.topbar-btn {
+  padding: 12px 16px;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid var(--primary) !important;
+  border-radius: 8px;
+  color: var(--primary);
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 14px; font-weight: 600;
+}
+.topbar-btn:hover {
+  background: var(--primary); color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+.topbar-btn.small { padding: 10px; font-size: 13px; }
+
+/* Live time indicator */
+.live-indicator {
+  padding: 12px;
+  margin-bottom: 16px;
+  background: rgba(59, 130, 246, 0.1);
+  border-radius: 8px;
+  border-left: 3px solid var(--primary);
+  display: flex; align-items: center; gap: 8px;
+}
+.pulse-indicator {
+  width: 8px; height: 8px;
+  background: var(--primary);
+  border-radius: 50%; position: relative;
+  animation: livePulse 2s ease-in-out infinite;
+}
+.pulse-indicator::before {
+  content: ''; position: absolute;
+  width: 100%; height: 100%; border-radius: 50%;
+  background: var(--primary);
+  animation: ripple 2s ease-out infinite;
+}
+@keyframes livePulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.2); opacity: 0.8; }
+}
+@keyframes ripple {
+  0% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(3); opacity: 0; }
+}
+body.girly-mode .pulse-indicator,
+body.girly-mode .pulse-indicator::before { background: #BA8FFF; }
+.live-indicator-label {
+  font-size: 11px; color: var(--text-secondary);
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+.live-indicator-value {
+  font-size: 13px; color: var(--primary); font-weight: 600;
+}
+
+/* Navegación del sidebar */
+.nav-section { margin-bottom: 24px; }
+.nav-title {
+  font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 1px; color: var(--text-secondary);
+  margin-bottom: 12px; padding: 0 12px;
+}
+.nav-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px; border-radius: 8px; cursor: pointer;
+  transition: all 0.2s; margin-bottom: 4px;
+  color: var(--text-secondary);
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif !important;
+}
+.nav-item:hover {
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--primary);
+  transform: translateX(4px);
+}
+.nav-item.active {
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  color: white;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+.nav-item i {
+  font-size: 18px; width: 24px; text-align: center;
+  display: inline-flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+
+/* ============================================================
+   MAIN CONTENT — donde antes iba el dashboard, ahora va el chat
+   ============================================================ */
+.main-content {
+  flex: 1;
+  margin-left: 280px;
+  height: 100vh;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+
+/* Topbar (igual que intranet) */
+.topbar {
+  display: flex; justify-content: space-between; align-items: center;
+  margin: 32px 32px 24px;
+  padding: 20px 24px;
+  background: rgba(30, 41, 59, 0.6);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border-color) !important;
+  border-radius: 16px;
+  flex-shrink: 0;
+  animation: slideInUp 0.6s ease-out both;
+}
+@keyframes slideInUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.topbar-left { display: flex; align-items: center; gap: 14px; }
+.bot-avatar {
+  width: 48px; height: 48px; border-radius: 12px;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; color: white;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+.topbar-left h2 { font-size: 24px; font-weight: 700; margin-bottom: 4px; }
+.topbar-left p { color: var(--text-secondary); font-size: 14px; display: flex; align-items: center; gap: 8px; }
+.status-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 8px var(--success);
+  animation: livePulse 2s ease-in-out infinite;
+}
+.topbar-actions { display: flex; gap: 12px; }
+
+/* Chat area */
+.chat-frame {
+  flex: 1;
+  margin: 0 32px 32px;
+  background: rgba(15, 23, 42, 0.92);
+  border: 1px solid var(--border-color) !important;
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex; flex-direction: column;
+  animation: slideInUp 0.6s ease-out 0.1s both;
+}
+
+.chat-main {
+  flex: 1;
+  overflow-y: auto; overflow-x: hidden;
+  padding: 28px 32px;
+  scroll-behavior: smooth;
+}
+
+.chat-container {
+  max-width: 880px; margin: 0 auto;
+  display: flex; flex-direction: column;
+  gap: 16px;
+}
+
+/* Welcome inicial */
+.welcome-card {
+  text-align: center;
+  padding: 40px 20px 20px;
+  animation: slideInUp 0.6s ease-out 0.2s both;
+}
+.welcome-emoji {
+  font-size: 64px; margin-bottom: 16px;
+  filter: drop-shadow(0 8px 20px rgba(59, 130, 246, 0.4));
+  animation: livePulse 3s ease-in-out infinite;
+}
+.welcome-title {
+  font-size: 26px; font-weight: 700;
+  margin-bottom: 8px; color: var(--text-primary);
+}
+.welcome-subtitle {
+  color: var(--text-secondary);
+  font-size: 14px; margin-bottom: 28px;
+}
+
+.suggestions {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 12px;
+  max-width: 720px;
+  margin: 0 auto;
+}
+.suggestion {
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid var(--border-color) !important;
+  border-radius: 12px;
+  padding: 14px 16px;
+  text-align: left;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.18s;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif !important;
+  font-size: 13px; font-weight: 600;
+  display: flex; align-items: center; gap: 10px;
+  animation: slideInUp 0.4s ease-out backwards;
+}
+.suggestion:nth-child(1) { animation-delay: 0.30s; }
+.suggestion:nth-child(2) { animation-delay: 0.35s; }
+.suggestion:nth-child(3) { animation-delay: 0.40s; }
+.suggestion:nth-child(4) { animation-delay: 0.45s; }
+.suggestion:nth-child(5) { animation-delay: 0.50s; }
+.suggestion:nth-child(6) { animation-delay: 0.55s; }
+.suggestion:nth-child(7) { animation-delay: 0.60s; }
+.suggestion:nth-child(8) { animation-delay: 0.65s; }
+.suggestion:hover {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: var(--primary) !important;
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+}
+.suggestion i { color: var(--primary); font-size: 14px; width: 18px; }
+.suggestion:hover i { color: white; }
+
+/* Mensajes */
+.message {
+  display: flex; gap: 12px;
+  max-width: 88%;
+  animation: msgIn 0.3s ease-out;
+}
+.message.user { align-self: flex-end; flex-direction: row-reverse; }
+@keyframes msgIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.msg-avatar {
+  width: 36px; height: 36px; border-radius: 10px;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px;
+}
+.message.bot .msg-avatar {
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  color: white;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+.message.user .msg-avatar {
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+}
+
+.msg-bubble {
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid var(--border-color) !important;
+  padding: 12px 16px;
+  border-radius: 14px;
+  font-size: 14px;
+  line-height: 1.55;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
+  max-width: 100%;
+  color: var(--text-primary);
+}
+.message.user .msg-bubble {
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  border-color: var(--primary) !important;
+  color: white;
+}
+
+.msg-bubble b, .msg-bubble strong { font-weight: 700; color: var(--text-primary); }
+.message.user .msg-bubble b { color: white; }
+.msg-bubble i, .msg-bubble em { font-style: italic; color: var(--text-secondary); }
+.message.user .msg-bubble i, .message.user .msg-bubble em { color: rgba(255,255,255,0.85); }
+.msg-bubble code {
+  background: rgba(15, 23, 42, 0.7);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 12.5px;
+  color: var(--secondary);
+}
+.message.user .msg-bubble code {
+  background: rgba(255,255,255,0.15);
+  color: white;
+}
+.msg-bubble pre {
+  background: rgba(15, 23, 42, 0.7);
+  padding: 10px 12px;
+  border-radius: 8px;
+  overflow-x: auto;
+  font-family: 'Courier New', monospace;
+  font-size: 12.5px;
+  margin: 6px 0;
+  border: 1px solid var(--border-color);
+}
+.msg-bubble a {
+  color: #60A5FA;
+  text-decoration: none;
+  border-bottom: 1px dotted #60A5FA;
+}
+.msg-bubble a:hover { border-bottom-style: solid; }
+.message.user .msg-bubble a { color: white; border-bottom-color: rgba(255,255,255,0.6); }
+
+/* Typing indicator */
+.typing {
+  display: flex; gap: 5px;
+  padding: 6px 4px;
+}
+.typing span {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--primary);
+  animation: bounce 1.2s ease-in-out infinite;
+}
+.typing span:nth-child(2) { animation-delay: 0.15s; }
+.typing span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes bounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+  30% { transform: translateY(-7px); opacity: 1; }
+}
+
+.error-banner {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #FCA5A5;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  display: flex; align-items: center; gap: 10px;
+  animation: msgIn 0.3s ease-out;
+}
+.error-banner i { font-size: 14px; }
+
+/* Composer (input area) */
+.composer {
+  padding: 18px 24px;
+  background: rgba(15, 23, 42, 0.6);
+  border-top: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+.composer-inner {
+  max-width: 880px; margin: 0 auto;
+  display: flex; gap: 12px; align-items: flex-end;
+}
+.composer-input-wrap {
+  flex: 1;
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid var(--border-color) !important;
+  border-radius: 12px;
+  padding: 12px 16px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.composer-input-wrap:focus-within {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+#message-input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif !important;
+  font-size: 15px;
+  resize: none;
+  max-height: 120px;
+  min-height: 22px;
+  line-height: 1.45;
+}
+#message-input::placeholder { color: var(--text-secondary); }
+
+.send-btn {
+  width: 48px; height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  border: none;
+  color: white;
+  cursor: pointer;
+  font-size: 16px;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.18s;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+.send-btn:hover:not(:disabled) {
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+}
+.send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ============================================================
+   MOBILE MENU
+   ============================================================ */
+.mobile-menu-btn {
+  display: none;
+  position: fixed;
+  top: 16px; left: 16px;
+  z-index: 300;
+  width: 44px; height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  border: none !important;
+  color: white; font-size: 18px; cursor: pointer;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+  transition: all 0.3s;
+  align-items: center; justify-content: center;
+}
+.mobile-menu-btn:active { transform: scale(0.93); }
+body.girly-mode .mobile-menu-btn {
+  background: linear-gradient(135deg, #8B5CF6, #BA8FFF);
+  box-shadow: 0 4px 12px rgba(186, 143, 255, 0.5);
+}
+
+@media (max-width: 768px) {
+  .mobile-menu-btn { display: flex; }
+  .sidebar {
+    transform: translateX(-100%);
+    width: 280px;
+    background: rgba(15, 23, 42, 0.98) !important;
+    backdrop-filter: blur(20px) !important;
+  }
+  .sidebar.active { transform: translateX(0); }
+  .main-content { margin-left: 0 !important; padding-top: 0 !important; }
+  .topbar { margin: 72px 16px 16px; padding: 16px 20px; }
+  .topbar-left h2 { font-size: 18px; }
+  .topbar-left p { font-size: 12px; }
+  .bot-avatar { width: 40px; height: 40px; font-size: 18px; }
+  .chat-frame { margin: 0 12px 16px; border-radius: 14px; }
+  .chat-main { padding: 18px 14px; }
+  .composer { padding: 14px 14px; }
+  .composer-inner { gap: 8px; }
+  .suggestions { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .welcome-card { padding: 24px 12px 14px; }
+  .welcome-emoji { font-size: 48px; }
+  .welcome-title { font-size: 20px; }
+  .message { max-width: 95%; }
+  .topbar-actions { display: none; }
+}
+
+/* ============================================================
+   GIRLY MODE (mismo patrón que la intranet)
+   ============================================================ */
+body.girly-mode {
+  background: linear-gradient(135deg, #0a0015 0%, #1a0b2e 50%, #0f0520 100%) !important;
+}
+body.girly-mode .sidebar {
+  background: rgba(10, 0, 21, 0.85) !important;
+  border-color: rgba(139, 92, 246, 0.5) !important;
+  box-shadow: 0 0 30px rgba(139, 92, 246, 0.3) !important;
+}
+body.girly-mode .topbar,
+body.girly-mode .chat-frame {
+  background: rgba(15, 5, 32, 0.92) !important;
+  border-color: rgba(186, 143, 255, 0.5) !important;
+}
+body.girly-mode .particle {
+  background: rgba(186, 143, 255, 0.8);
+  box-shadow: 0 0 6px rgba(186, 143, 255, 0.8);
+}
+body.girly-mode .bot-avatar,
+body.girly-mode .message.bot .msg-avatar,
+body.girly-mode .nav-item.active,
+body.girly-mode .send-btn,
+body.girly-mode .message.user .msg-bubble {
+  background: linear-gradient(135deg, #8B5CF6, #BA8FFF) !important;
+  box-shadow: 0 4px 12px rgba(186, 143, 255, 0.4) !important;
+}
+body.girly-mode .message.user .msg-bubble {
+  border-color: #BA8FFF !important;
+}
+body.girly-mode .topbar-btn {
+  background: rgba(186, 143, 255, 0.1);
+  border-color: #BA8FFF !important;
+  color: #BA8FFF;
+}
+body.girly-mode .topbar-btn:hover {
+  background: #BA8FFF; color: white;
+  box-shadow: 0 4px 12px rgba(186, 143, 255, 0.4);
+}
+body.girly-mode .composer-input-wrap:focus-within {
+  border-color: #BA8FFF !important;
+  box-shadow: 0 0 0 3px rgba(186, 143, 255, 0.2);
+}
+body.girly-mode .suggestion:hover {
+  background: rgba(186, 143, 255, 0.15);
+  border-color: #BA8FFF !important;
+  box-shadow: 0 4px 12px rgba(186, 143, 255, 0.2);
+}
+body.girly-mode .suggestion i,
+body.girly-mode .live-indicator-value,
+body.girly-mode .nav-item:hover {
+  color: #BA8FFF;
+}
+body.girly-mode .nav-item:hover {
+  background: rgba(186, 143, 255, 0.1);
+}
+body.girly-mode .live-indicator {
+  background: rgba(186, 143, 255, 0.1);
+  border-left-color: #BA8FFF;
+}
+body.girly-mode .status-dot {
+  background: #DB7093;
+  box-shadow: 0 0 8px #DB7093;
+}
+body.girly-mode .typing span { background: #BA8FFF; }
+</style>
+</head>
+<body class="notranslate" translate="no">
+
+<!-- Partículas de fondo -->
+<div id="particles"></div>
+
+<!-- Botón menú hamburguesa (solo móvil) -->
+<button id="mobile-menu-btn" class="mobile-menu-btn" onclick="toggleSidebar()">
+  <i class="fas fa-bars"></i>
+</button>
+
+<div class="app-container">
+
+  <!-- ============================================================
+       SIDEBAR
+       ============================================================ -->
+  <aside class="sidebar" id="sidebar">
+
+    <!-- Logo -->
+    <div class="logo-container">
+      <a href="https://script.google.com/macros/s/AKfycbx9y0Nr4thwHCAdQYaeHD_48gCukdPc4PvU8r10vh6RD_qbMRse4j1fReOZEQX2fcs9Wg/exec"
+         target="_blank" title="Ir a Electronics México - Intranet">
+        <img src="https://i.imgur.com/cVfOQOW.jpeg" alt="Logo" class="logo-img">
+      </a>
+      <div class="logo-text">
+        <h1>Electronics México</h1>
+        <p>Bot · Asistente</p>
+      </div>
+    </div>
+
+    <!-- Controles rápidos -->
+    <div class="sidebar-controls">
+      <button class="topbar-btn small" onclick="limpiarChat()" title="Limpiar conversación">
+        <i class="fas fa-broom"></i>
+      </button>
+      <button class="topbar-btn small" id="toggle-theme" onclick="toggleGirlyMode()" title="Modo Girly">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+
+    <!-- Indicador en vivo -->
+    <div class="live-indicator">
+      <div class="pulse-indicator"></div>
+      <div style="flex: 1;">
+        <div class="live-indicator-label">Sistema en vivo</div>
+        <div class="live-indicator-value" id="live-time">--:--:--</div>
+      </div>
+    </div>
+
+    <!-- Navegación / accesos rápidos -->
+    <nav>
+      <div class="nav-section">
+        <div class="nav-title">🤖 Bot</div>
+        <div class="nav-item active" onclick="enfocarInput()">
+          <i class="fas fa-comments"></i>
+          <span>Chat</span>
+        </div>
+        <div class="nav-item" onclick="sendMessage('ayuda')">
+          <i class="fas fa-circle-info"></i>
+          <span>Ayuda</span>
+        </div>
+        <div class="nav-item" onclick="limpiarChat()">
+          <i class="fas fa-broom"></i>
+          <span>Limpiar</span>
+        </div>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-title">📦 Inventario</div>
+        <div class="nav-item" onclick="sendMessage('stock')">
+          <i class="fas fa-boxes-stacked"></i>
+          <span>Stock</span>
+        </div>
+        <div class="nav-item" onclick="sendMessage('venta hoy')">
+          <i class="fas fa-chart-line"></i>
+          <span>Ventas</span>
+        </div>
+        <div class="nav-item" onclick="sendMessage('sobreventa')">
+          <i class="fas fa-triangle-exclamation"></i>
+          <span>Sobreventa</span>
+        </div>
+        <div class="nav-item" onclick="sendMessage('por recibir')">
+          <i class="fas fa-truck"></i>
+          <span>Por recibir</span>
+        </div>
+        <div class="nav-item" onclick="sendMessage('traslados')">
+          <i class="fas fa-arrow-right-arrow-left"></i>
+          <span>Traslados</span>
+        </div>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-title">⏰ Checador</div>
+        <div class="nav-item" onclick="sendMessage('checador')">
+          <i class="fas fa-fingerprint"></i>
+          <span>Asistencia hoy</span>
+        </div>
+        <div class="nav-item" onclick="sendMessage('bono puntualidad')">
+          <i class="fas fa-trophy"></i>
+          <span>Bono</span>
+        </div>
+        <div class="nav-item" onclick="sendMessage('retardos')">
+          <i class="fas fa-clock"></i>
+          <span>Retardos</span>
+        </div>
+        <div class="nav-item" onclick="sendMessage('faltas')">
+          <i class="fas fa-user-times"></i>
+          <span>Faltas</span>
+        </div>
+        <div class="nav-item" onclick="sendMessage('vacaciones')">
+          <i class="fas fa-umbrella-beach"></i>
+          <span>Vacaciones</span>
+        </div>
+        <div class="nav-item" onclick="sendMessage('enfermedades')">
+          <i class="fas fa-notes-medical"></i>
+          <span>Enfermedades</span>
+        </div>
+        <div class="nav-item" onclick="sendMessage('gym')">
+          <i class="fas fa-dumbbell"></i>
+          <span>Gym</span>
+        </div>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-title">💰 Precios</div>
+        <div class="nav-item" onclick="sendMessage('precios erroneos')">
+          <i class="fas fa-circle-exclamation"></i>
+          <span>Erróneos</span>
+        </div>
+        <div class="nav-item" onclick="sendMessage('vendedores incorrectos')">
+          <i class="fas fa-user-tag"></i>
+          <span>Vendedores</span>
+        </div>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-title">📊 Marketplaces</div>
+        <div class="nav-item" onclick="sendMessage('ventiapp')">
+          <i class="fas fa-store"></i>
+          <span>Ventiapp</span>
+        </div>
+        <div class="nav-item" onclick="sendMessage('killers')">
+          <i class="fas fa-bullseye"></i>
+          <span>Killers</span>
+        </div>
+      </div>
+    </nav>
+  </aside>
+
+  <!-- ============================================================
+       MAIN CONTENT — chat
+       ============================================================ -->
+  <main class="main-content">
+
+    <!-- Topbar -->
+    <div class="topbar">
+      <div class="topbar-left">
+        <div class="bot-avatar">
+          <i class="fas fa-robot"></i>
+        </div>
+        <div>
+          <h2>Asistente Electronics México</h2>
+          <p>
+            <span class="status-dot"></span>
+            <span id="status-text">En línea</span>
+          </p>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <button class="topbar-btn" onclick="sendMessage('ayuda')" title="Ver comandos">
+          <i class="fas fa-circle-info"></i>
+          Ayuda
+        </button>
+      </div>
+    </div>
+
+    <!-- Chat frame -->
+    <div class="chat-frame">
+      <div class="chat-main" id="chat-main">
+        <div class="chat-container" id="chat-container">
+          <div class="welcome-card" id="welcome-card">
+            <div class="welcome-emoji">🤖</div>
+            <div class="welcome-title">¿En qué puedo ayudarte?</div>
+            <div class="welcome-subtitle">Escribe una pregunta o usa uno de estos atajos</div>
+            <div class="suggestions">
+              <button class="suggestion" data-q="ayuda">
+                <i class="fas fa-circle-info"></i>
+                <span>Ayuda</span>
+              </button>
+              <button class="suggestion" data-q="stock 4699">
+                <i class="fas fa-boxes-stacked"></i>
+                <span>Buscar stock</span>
+              </button>
+              <button class="suggestion" data-q="venta hoy">
+                <i class="fas fa-chart-line"></i>
+                <span>Ventas de hoy</span>
+              </button>
+              <button class="suggestion" data-q="sobreventa">
+                <i class="fas fa-triangle-exclamation"></i>
+                <span>Sobreventa</span>
+              </button>
+              <button class="suggestion" data-q="bono puntualidad">
+                <i class="fas fa-trophy"></i>
+                <span>Bono puntualidad</span>
+              </button>
+              <button class="suggestion" data-q="retardos">
+                <i class="fas fa-clock"></i>
+                <span>Retardos</span>
+              </button>
+              <button class="suggestion" data-q="checador">
+                <i class="fas fa-fingerprint"></i>
+                <span>Checador hoy</span>
+              </button>
+              <button class="suggestion" data-q="gym">
+                <i class="fas fa-dumbbell"></i>
+                <span>Gym</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Composer -->
+      <div class="composer">
+        <div class="composer-inner">
+          <div class="composer-input-wrap">
+            <textarea id="message-input"
+                      placeholder="Pregúntame algo..."
+                      rows="1"
+                      autocomplete="off"
+                      autofocus></textarea>
+          </div>
+          <button class="send-btn" id="send-btn" title="Enviar (Enter)">
+            <i class="fas fa-paper-plane"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+/* ============================================================
+   CONFIGURACIÓN — ajusta WORKER_URL si cambia tu Worker
+   ============================================================ */
+const WORKER_URL = 'https://electronics-bot.victor-walmart-04.workers.dev/api/query';
+
+/* ID de sesión persistente por navegador */
+const SESSION_ID = (function() {
+  let id = localStorage.getItem('em-bot-session');
+  if (!id) {
+    id = 's_' + Math.random().toString(36).slice(2, 11);
+    localStorage.setItem('em-bot-session', id);
+  }
+  return id;
+})();
+
+/* ============================================================
+   PARTÍCULAS DE FONDO (igual que intranet)
+   ============================================================ */
+function generarParticulas() {
+  const container = document.getElementById('particles');
+  if (!container) return;
+  const count = window.innerWidth < 768 ? 20 : 40;
+  const anims = ['floatOrganic1', 'floatOrganic2', 'floatOrganic3'];
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    p.style.left = Math.random() * 100 + '%';
+    p.style.animation = anims[i % 3] + ' ' + (15 + Math.random() * 15) + 's linear infinite';
+    p.style.animationDelay = (Math.random() * 15) + 's';
+    container.appendChild(p);
+  }
+}
+
+/* ============================================================
+   LIVE CLOCK
+   ============================================================ */
+function actualizarReloj() {
+  const ahora = new Date();
+  const t = ahora.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  const el = document.getElementById('live-time');
+  if (el) el.textContent = t;
+}
+
+/* ============================================================
+   GIRLY MODE
+   ============================================================ */
+function toggleGirlyMode() {
+  const isGirly = document.body.classList.toggle('girly-mode');
+  localStorage.setItem('em-bot-girly', isGirly ? '1' : '0');
+  const icon = document.querySelector('#toggle-theme i');
+  if (icon) icon.className = isGirly ? 'fas fa-heart' : 'fas fa-times';
+}
+function aplicarGirlyGuardado() {
+  if (localStorage.getItem('em-bot-girly') === '1') {
+    document.body.classList.add('girly-mode');
+    const icon = document.querySelector('#toggle-theme i');
+    if (icon) icon.className = 'fas fa-heart';
+  }
+}
+
+/* ============================================================
+   MOBILE MENU
+   ============================================================ */
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('active');
+}
+function cerrarSidebarSiMobile() {
+  if (window.innerWidth <= 768) {
+    document.getElementById('sidebar').classList.remove('active');
+  }
+}
+
+/* ============================================================
+   CHAT — referencias DOM
+   ============================================================ */
+const chatMain      = document.getElementById('chat-main');
+const chatContainer = document.getElementById('chat-container');
+const welcomeCard   = document.getElementById('welcome-card');
+const messageInput  = document.getElementById('message-input');
+const sendBtn       = document.getElementById('send-btn');
+const statusText    = document.getElementById('status-text');
+
+/* ============================================================
+   HELPERS DE RENDERIZADO
+   ============================================================ */
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// Sanitiza HTML del bot — solo tags whitelist (parse_mode HTML de Telegram)
+function sanitizeBotHtml(html) {
+  let safe = escapeHtml(html);
+  safe = safe
+    .replace(/&lt;(\/?(?:b|strong|i|em|u|s|code|pre|br))&gt;/gi, '<$1>')
+    .replace(/&lt;a\s+href=&quot;([^&"]*)&quot;&gt;/gi, '<a href="$1" target="_blank" rel="noopener">')
+    .replace(/&lt;\/a&gt;/gi, '</a>');
+  return safe;
+}
+
+function scrollToBottom() {
+  requestAnimationFrame(() => { chatMain.scrollTop = chatMain.scrollHeight; });
+}
+
+function autoResize() {
+  messageInput.style.height = 'auto';
+  messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + 'px';
+}
+
+function hideWelcome() {
+  if (welcomeCard) welcomeCard.style.display = 'none';
+}
+
+function addUserMessage(text) {
+  hideWelcome();
+  const msg = document.createElement('div');
+  msg.className = 'message user';
+  msg.innerHTML =
+    '<div class="msg-avatar"><i class="fas fa-user"></i></div>' +
+    '<div class="msg-bubble">' + escapeHtml(text) + '</div>';
+  chatContainer.appendChild(msg);
+  scrollToBottom();
+}
+
+function addBotMessage(html) {
+  const msg = document.createElement('div');
+  msg.className = 'message bot';
+  msg.innerHTML =
+    '<div class="msg-avatar"><i class="fas fa-robot"></i></div>' +
+    '<div class="msg-bubble">' + sanitizeBotHtml(html) + '</div>';
+  chatContainer.appendChild(msg);
+  scrollToBottom();
+}
+
+function addTypingIndicator() {
+  const msg = document.createElement('div');
+  msg.className = 'message bot';
+  msg.id = 'typing-indicator';
+  msg.innerHTML =
+    '<div class="msg-avatar"><i class="fas fa-robot"></i></div>' +
+    '<div class="msg-bubble"><div class="typing"><span></span><span></span><span></span></div></div>';
+  chatContainer.appendChild(msg);
+  scrollToBottom();
+}
+
+function removeTypingIndicator() {
+  const t = document.getElementById('typing-indicator');
+  if (t) t.remove();
+}
+
+function addErrorBanner(errMsg) {
+  const banner = document.createElement('div');
+  banner.className = 'error-banner';
+  banner.innerHTML = '<i class="fas fa-circle-exclamation"></i><span>' + escapeHtml(errMsg) + '</span>';
+  chatContainer.appendChild(banner);
+  scrollToBottom();
+}
+
+/* ============================================================
+   LLAMADA AL BOT
+   ============================================================ */
+async function sendMessage(text) {
+  if (!text || !text.trim()) return;
+  text = text.trim();
+
+  cerrarSidebarSiMobile();
+  addUserMessage(text);
+  messageInput.value = '';
+  autoResize();
+  sendBtn.disabled = true;
+  statusText.textContent = 'Procesando...';
+
+  addTypingIndicator();
+
+  try {
+    const r = await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text, session: SESSION_ID, user: 'Web' })
+    });
+
+    removeTypingIndicator();
+
+    if (!r.ok) {
+      const errText = await r.text().catch(() => '');
+      addErrorBanner('Error ' + r.status + (errText ? ': ' + errText.slice(0, 200) : ''));
+      return;
+    }
+
+    const data = await r.json();
+    const messages = data.messages || [];
+
+    if (messages.length === 0) {
+      addBotMessage('<i>Sin respuesta del bot.</i>');
+    } else {
+      messages.forEach(m => addBotMessage(m));
+    }
+  } catch (e) {
+    removeTypingIndicator();
+    addErrorBanner('No se pudo conectar con el bot: ' + e.message);
+  } finally {
+    sendBtn.disabled = false;
+    statusText.textContent = 'En línea';
+    if (window.innerWidth > 768) messageInput.focus();
+  }
+}
+
+/* ============================================================
+   ACCIONES UI
+   ============================================================ */
+function limpiarChat() {
+  Array.from(chatContainer.children).forEach(c => {
+    if (c.id !== 'welcome-card') c.remove();
+  });
+  if (welcomeCard) welcomeCard.style.display = '';
+  if (window.innerWidth > 768) messageInput.focus();
+}
+
+function enfocarInput() {
+  cerrarSidebarSiMobile();
+  if (window.innerWidth > 768) messageInput.focus();
+}
+
+/* ============================================================
+   EVENTOS
+   ============================================================ */
+sendBtn.addEventListener('click', () => sendMessage(messageInput.value));
+
+messageInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage(messageInput.value);
+  }
+});
+messageInput.addEventListener('input', autoResize);
+
+document.querySelectorAll('.suggestion').forEach(b => {
+  b.addEventListener('click', () => sendMessage(b.dataset.q));
+});
+
+/* ============================================================
+   INIT
+   ============================================================ */
+window.addEventListener('load', () => {
+  generarParticulas();
+  aplicarGirlyGuardado();
+  actualizarReloj();
+  setInterval(actualizarReloj, 1000);
+  if (window.innerWidth > 768) messageInput.focus();
+});
+</script>
+
+</body>
+</html>
