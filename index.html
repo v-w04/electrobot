@@ -1290,7 +1290,9 @@ body.girly-mode .typing span { background: #BA8FFF; }
           <button type="button" data-quick="ayer">Ayer</button>
           <button type="button" data-quick="manana">Mañana</button>
           <button type="button" data-quick="esta-semana">Esta semana</button>
+          <button type="button" data-quick="semana-siguiente" data-futuro="1">Semana siguiente</button>
           <button type="button" data-quick="este-mes" class="active">Este mes</button>
+          <button type="button" data-quick="mes-siguiente" data-futuro="1">Mes siguiente</button>
           <button type="button" data-quick="mes-pasado">Mes pasado</button>
           <button type="button" data-quick="quincena-actual">Quincena actual</button>
         </div>
@@ -1467,7 +1469,7 @@ const COMANDOS = {
     titulo: 'Vacaciones',
     icono: 'fa-umbrella-beach',
     filtros: { fechas: true, empleado: true, empleadoOpcional: true,
-               fechasOpcional: true },
+               fechasOpcional: true, fechasFuturo: true },
     build: f => {
       const parts = ['vacaciones'];
       if (f.empleado) parts.push(f.empleado);
@@ -1609,11 +1611,27 @@ function rangoQuick(quick) {
       // Lunes a domingo de esta semana
       const diaSem = hoy.getDay() || 7; // 0=domingo → 7
       ini.setDate(hoy.getDate() - (diaSem - 1));
+      fin.setTime(ini.getTime());
+      fin.setDate(ini.getDate() + 6);
+      break;
+    case 'semana-siguiente':
+      // Lunes a domingo de la PRÓXIMA semana
+      const diaSemS = hoy.getDay() || 7; // 0=domingo → 7
+      ini.setDate(hoy.getDate() - (diaSemS - 1) + 7);
+      // fin = ini + 6 días (derivado de ini para no cruzar mal de mes)
+      fin.setTime(ini.getTime());
       fin.setDate(ini.getDate() + 6);
       break;
     case 'este-mes':
       ini.setDate(1);
       fin.setMonth(fin.getMonth() + 1, 0); // último día del mes
+      break;
+    case 'mes-siguiente':
+      // Mes COMPLETO siguiente (día 1 al último día)
+      ini.setMonth(ini.getMonth() + 1, 1);
+      // fin = último día del mes de ini (mes+1, día 0 = último del mes anterior)
+      fin.setTime(ini.getTime());
+      fin.setMonth(ini.getMonth() + 1, 0);
       break;
     case 'mes-pasado':
       ini.setMonth(ini.getMonth() - 1, 1);
@@ -1662,6 +1680,13 @@ async function abrirFiltros(comandoId) {
   document.getElementById('seccion-fechas').style.display   = showFechas   ? '' : 'none';
   document.getElementById('seccion-empleado').style.display = showEmpleado ? '' : 'none';
   document.getElementById('seccion-sku').style.display      = showSku      ? '' : 'none';
+
+  // Botones de fecha A FUTURO (semana/mes siguiente): solo en módulos
+  // que tengan datos futuros (ej. vacaciones). En el resto se ocultan.
+  const mostrarFuturo = !!cfg.filtros.fechasFuturo;
+  document.querySelectorAll('.quick-dates button[data-futuro]').forEach(b => {
+    b.style.display = mostrarFuturo ? '' : 'none';
+  });
 
   // Banner "sin filtros" cuando no hay nada que filtrar (bono/retardos)
   const seccionInfo = document.getElementById('seccion-info');
