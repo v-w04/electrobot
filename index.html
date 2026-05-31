@@ -623,6 +623,235 @@ body.girly-mode .pulse-indicator::before { background: #BA8FFF; }
 .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* ============================================================
+   MODAL DE FILTROS
+   ============================================================ */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(6px);
+  z-index: 500;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: modalFadeIn 0.18s ease;
+}
+.modal-overlay.active { display: flex; }
+@keyframes modalFadeIn {
+  from { opacity: 0; } to { opacity: 1; }
+}
+
+.modal-panel {
+  background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
+  border: 1px solid rgba(59, 130, 246, 0.4) !important;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 540px;
+  max-height: 90vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5),
+              0 0 40px rgba(59, 130, 246, 0.15);
+  animation: modalIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes modalIn {
+  from { opacity: 0; transform: translateY(20px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.modal-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border-color);
+}
+.modal-header h3 {
+  font-size: 18px; font-weight: 700;
+  color: var(--text-primary);
+  display: flex; align-items: center; gap: 10px;
+}
+.modal-header h3 i { color: var(--primary); font-size: 18px; }
+
+.modal-close {
+  width: 36px; height: 36px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3) !important;
+  border-radius: 8px;
+  color: var(--danger);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s; font-size: 14px;
+}
+.modal-close:hover {
+  background: var(--danger); color: white;
+  transform: rotate(90deg);
+}
+
+.modal-body {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.filter-section { margin-bottom: 20px; }
+.filter-section:last-child { margin-bottom: 0; }
+
+.filter-label {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; font-weight: 700;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+}
+.filter-label i { color: var(--primary); font-size: 13px; }
+
+.filter-hint {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 6px;
+  font-style: italic;
+}
+.filter-hint code {
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--primary);
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  font-style: normal;
+}
+
+.quick-dates {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin-bottom: 12px;
+}
+.quick-dates button {
+  padding: 8px 12px;
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid var(--border-color) !important;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif !important;
+  font-size: 12px; font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s;
+}
+.quick-dates button:hover {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: var(--primary) !important;
+  color: var(--primary);
+}
+.quick-dates button.active {
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  border-color: var(--primary) !important;
+  color: white;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.date-inputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.date-field label {
+  display: block;
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.date-field input[type="date"],
+.filter-section input[type="text"] {
+  width: 100%;
+  padding: 10px 12px;
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid var(--border-color) !important;
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif !important;
+  font-size: 14px;
+  transition: border-color 0.2s;
+}
+.date-field input[type="date"] { color-scheme: dark; }
+.date-field input[type="date"]:focus,
+.filter-section input[type="text"]:focus {
+  outline: none;
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+.filter-section input[type="text"]::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+
+.modal-footer {
+  display: flex; justify-content: flex-end; gap: 10px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--border-color);
+}
+.btn-primary, .btn-secondary {
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif !important;
+  font-size: 14px; font-weight: 600;
+  cursor: pointer;
+  display: inline-flex; align-items: center; gap: 8px;
+  transition: all 0.2s;
+  border: 1px solid transparent !important;
+}
+.btn-primary {
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  color: white;
+  border-color: var(--primary) !important;
+}
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+.btn-secondary {
+  background: transparent;
+  color: var(--text-secondary);
+  border-color: var(--border-color) !important;
+}
+.btn-secondary:hover {
+  background: rgba(148, 163, 184, 0.1);
+  color: var(--text-primary);
+}
+
+body.girly-mode .modal-panel {
+  background: linear-gradient(135deg, #1a0b2e 0%, #0f0520 100%);
+  border-color: rgba(186, 143, 255, 0.5) !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5),
+              0 0 40px rgba(186, 143, 255, 0.2);
+}
+body.girly-mode .modal-header h3 i,
+body.girly-mode .filter-label i,
+body.girly-mode .filter-hint code { color: #BA8FFF; }
+body.girly-mode .quick-dates button.active,
+body.girly-mode .btn-primary {
+  background: linear-gradient(135deg, #8B5CF6, #BA8FFF);
+  border-color: #BA8FFF !important;
+}
+body.girly-mode .quick-dates button:hover {
+  border-color: #BA8FFF !important;
+  color: #BA8FFF;
+}
+body.girly-mode .filter-section input:focus,
+body.girly-mode .date-field input:focus {
+  border-color: #BA8FFF !important;
+  box-shadow: 0 0 0 3px rgba(186, 143, 255, 0.2);
+}
+
+@media (max-width: 480px) {
+  .modal-panel { max-height: 95vh; }
+  .modal-body { padding: 16px; }
+  .modal-header { padding: 14px 16px; }
+  .modal-footer { padding: 12px 16px; }
+  .date-inputs { grid-template-columns: 1fr; }
+  .quick-dates button { font-size: 11px; padding: 7px 10px; }
+}
+
+/* ============================================================
    MOBILE MENU
    ============================================================ */
 .mobile-menu-btn {
@@ -813,11 +1042,11 @@ body.girly-mode .typing span { background: #BA8FFF; }
 
       <div class="nav-section">
         <div class="nav-title">📦 Inventario</div>
-        <div class="nav-item" onclick="sendMessage('stock')">
+        <div class="nav-item" onclick="abrirFiltros('stock')">
           <i class="fas fa-boxes-stacked"></i>
           <span>Stock</span>
         </div>
-        <div class="nav-item" onclick="sendMessage('venta hoy')">
+        <div class="nav-item" onclick="abrirFiltros('ventas')">
           <i class="fas fa-chart-line"></i>
           <span>Ventas</span>
         </div>
@@ -829,7 +1058,7 @@ body.girly-mode .typing span { background: #BA8FFF; }
           <i class="fas fa-truck"></i>
           <span>Por recibir</span>
         </div>
-        <div class="nav-item" onclick="sendMessage('traslados')">
+        <div class="nav-item" onclick="abrirFiltros('traslados')">
           <i class="fas fa-arrow-right-arrow-left"></i>
           <span>Traslados</span>
         </div>
@@ -837,9 +1066,9 @@ body.girly-mode .typing span { background: #BA8FFF; }
 
       <div class="nav-section">
         <div class="nav-title">⏰ Checador</div>
-        <div class="nav-item" onclick="sendMessage('checador')">
+        <div class="nav-item" onclick="abrirFiltros('asistencia')">
           <i class="fas fa-fingerprint"></i>
-          <span>Asistencia hoy</span>
+          <span>Asistencia</span>
         </div>
         <div class="nav-item" onclick="sendMessage('bono puntualidad')">
           <i class="fas fa-trophy"></i>
@@ -849,19 +1078,19 @@ body.girly-mode .typing span { background: #BA8FFF; }
           <i class="fas fa-clock"></i>
           <span>Retardos</span>
         </div>
-        <div class="nav-item" onclick="sendMessage('faltas')">
+        <div class="nav-item" onclick="abrirFiltros('faltas')">
           <i class="fas fa-user-times"></i>
           <span>Faltas</span>
         </div>
-        <div class="nav-item" onclick="sendMessage('vacaciones')">
+        <div class="nav-item" onclick="abrirFiltros('vacaciones')">
           <i class="fas fa-umbrella-beach"></i>
           <span>Vacaciones</span>
         </div>
-        <div class="nav-item" onclick="sendMessage('enfermedades')">
+        <div class="nav-item" onclick="abrirFiltros('enfermedades')">
           <i class="fas fa-notes-medical"></i>
           <span>Enfermedades</span>
         </div>
-        <div class="nav-item" onclick="sendMessage('gym')">
+        <div class="nav-item" onclick="abrirFiltros('gym')">
           <i class="fas fa-dumbbell"></i>
           <span>Gym</span>
         </div>
@@ -869,11 +1098,11 @@ body.girly-mode .typing span { background: #BA8FFF; }
 
       <div class="nav-section">
         <div class="nav-title">💰 Precios</div>
-        <div class="nav-item" onclick="sendMessage('precios erroneos')">
+        <div class="nav-item" onclick="abrirFiltros('preciosErroneos')">
           <i class="fas fa-circle-exclamation"></i>
           <span>Erróneos</span>
         </div>
-        <div class="nav-item" onclick="sendMessage('vendedores incorrectos')">
+        <div class="nav-item" onclick="abrirFiltros('vendedoresIncorrectos')">
           <i class="fas fa-user-tag"></i>
           <span>Vendedores</span>
         </div>
@@ -881,7 +1110,7 @@ body.girly-mode .typing span { background: #BA8FFF; }
 
       <div class="nav-section">
         <div class="nav-title">📊 Marketplaces</div>
-        <div class="nav-item" onclick="sendMessage('ventiapp')">
+        <div class="nav-item" onclick="abrirFiltros('ventiapp')">
           <i class="fas fa-store"></i>
           <span>Ventiapp</span>
         </div>
@@ -986,11 +1215,90 @@ body.girly-mode .typing span { background: #BA8FFF; }
   </main>
 </div>
 
+<!-- ============================================================
+     MODAL DE FILTROS — se usa para los botones del sidebar
+     ============================================================ -->
+<div class="modal-overlay" id="modal-filtros" onclick="cerrarFiltrosBackdrop(event)">
+  <div class="modal-panel" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h3 id="modal-titulo">
+        <i class="fas fa-sliders"></i>
+        <span>Filtros</span>
+      </h3>
+      <button class="modal-close" onclick="cerrarFiltros()" aria-label="Cerrar">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+
+    <div class="modal-body">
+
+      <!-- Sección de fechas -->
+      <div class="filter-section" id="seccion-fechas">
+        <label class="filter-label">
+          <i class="fas fa-calendar"></i> Periodo
+        </label>
+        <div class="quick-dates" id="quick-dates">
+          <button type="button" data-quick="hoy">Hoy</button>
+          <button type="button" data-quick="ayer">Ayer</button>
+          <button type="button" data-quick="manana">Mañana</button>
+          <button type="button" data-quick="esta-semana">Esta semana</button>
+          <button type="button" data-quick="este-mes" class="active">Este mes</button>
+          <button type="button" data-quick="mes-pasado">Mes pasado</button>
+          <button type="button" data-quick="quincena-actual">Quincena actual</button>
+        </div>
+        <div class="date-inputs">
+          <div class="date-field">
+            <label>Desde</label>
+            <input type="date" id="fecha-ini">
+          </div>
+          <div class="date-field">
+            <label>Hasta</label>
+            <input type="date" id="fecha-fin">
+          </div>
+        </div>
+      </div>
+
+      <!-- Sección de empleado -->
+      <div class="filter-section" id="seccion-empleado">
+        <label class="filter-label">
+          <i class="fas fa-user"></i> Empleado
+        </label>
+        <input type="text" id="empleado-input" list="empleados-dl"
+               placeholder="Escribe nombre (déjalo vacío para todos)"
+               autocomplete="off">
+        <datalist id="empleados-dl"></datalist>
+        <div class="filter-hint" id="empleado-hint">Cargando lista...</div>
+      </div>
+
+      <!-- Sección de SKU / búsqueda -->
+      <div class="filter-section" id="seccion-sku">
+        <label class="filter-label">
+          <i class="fas fa-search"></i> Búsqueda
+        </label>
+        <input type="text" id="sku-input"
+               placeholder="SKU, marca, color, cliente, etc."
+               autocomplete="off">
+        <div class="filter-hint">Ej: <code>4699</code>, <code>AMA-</code>, <code>walmart</code></div>
+      </div>
+
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="cerrarFiltros()">Cancelar</button>
+      <button class="btn-primary" onclick="consultarConFiltros()">
+        <i class="fas fa-paper-plane"></i>
+        Consultar
+      </button>
+    </div>
+  </div>
+</div>
+
 <script>
 /* ============================================================
    CONFIGURACIÓN — ajusta WORKER_URL si cambia tu Worker
    ============================================================ */
 const WORKER_URL = 'https://electronics-bot.victor-walmart-04.workers.dev/api/query';
+const WORKER_EMPLEADOS_URL = 'https://electronics-bot.victor-walmart-04.workers.dev/api/empleados';
 
 /* ID de sesión persistente por navegador */
 const SESSION_ID = (function() {
@@ -1001,6 +1309,338 @@ const SESSION_ID = (function() {
   }
   return id;
 })();
+
+/* ============================================================
+   CONFIGURACIÓN DE COMANDOS DEL SIDEBAR — qué filtros muestra cada uno
+   y cómo se arma el comando final que se manda al bot.
+   ============================================================ */
+const COMANDOS = {
+  // Inventario
+  stock: {
+    titulo: 'Stock',
+    icono: 'fa-boxes-stacked',
+    filtros: { sku: true },
+    build: f => 'stock ' + (f.sku || '').trim(),
+    requiere: ['sku']
+  },
+  ventas: {
+    titulo: 'Ventas',
+    icono: 'fa-chart-line',
+    filtros: { fechas: true },
+    build: f => 'venta ' + f.fechaIni + ' ' + f.fechaFin
+  },
+  traslados: {
+    titulo: 'Traslados',
+    icono: 'fa-arrow-right-arrow-left',
+    filtros: { fechas: true },
+    build: f => 'traslados ' + f.fechaIni + ' ' + f.fechaFin
+  },
+
+  // Checador
+  asistencia: {
+    titulo: 'Asistencia',
+    icono: 'fa-fingerprint',
+    filtros: { fechas: true, empleado: true },
+    build: f => {
+      const base = f.empleado ? ('asistencia ' + f.empleado) : 'checador';
+      return base + ' ' + f.fechaIni + ' ' + f.fechaFin;
+    }
+  },
+  faltas: {
+    titulo: 'Faltas',
+    icono: 'fa-user-times',
+    filtros: { fechas: true },
+    build: f => 'faltas ' + f.fechaIni + ' ' + f.fechaFin
+  },
+  vacaciones: {
+    titulo: 'Vacaciones',
+    icono: 'fa-umbrella-beach',
+    filtros: { empleado: true, fechas: true },
+    build: f => {
+      const base = f.empleado ? ('vacaciones ' + f.empleado) : 'vacaciones';
+      return base + ' ' + f.fechaIni + ' ' + f.fechaFin;
+    }
+  },
+  enfermedades: {
+    titulo: 'Enfermedades',
+    icono: 'fa-notes-medical',
+    filtros: { empleado: true, fechas: true },
+    build: f => {
+      const base = f.empleado ? ('enfermedades ' + f.empleado) : 'enfermedades';
+      return base + ' ' + f.fechaIni + ' ' + f.fechaFin;
+    }
+  },
+  gym: {
+    titulo: 'Gym',
+    icono: 'fa-dumbbell',
+    filtros: { empleado: true },
+    build: f => f.empleado ? ('gym ' + f.empleado) : 'gym'
+  },
+
+  // Precios
+  preciosErroneos: {
+    titulo: 'Precios erróneos',
+    icono: 'fa-circle-exclamation',
+    filtros: { fechas: true },
+    build: f => 'precios erroneos ' + f.fechaIni + ' ' + f.fechaFin
+  },
+  vendedoresIncorrectos: {
+    titulo: 'Vendedores incorrectos',
+    icono: 'fa-user-tag',
+    filtros: { fechas: true },
+    build: f => 'vendedores incorrectos ' + f.fechaIni + ' ' + f.fechaFin
+  },
+
+  // Marketplaces
+  ventiapp: {
+    titulo: 'Ventiapp',
+    icono: 'fa-store',
+    filtros: { sku: true },
+    build: f => 'ventiapp ' + (f.sku || '').trim(),
+    requiere: ['sku']
+  }
+};
+
+/* ============================================================
+   LISTA DE EMPLEADOS — fetch & cache (1 hora)
+   ============================================================ */
+const EMPLEADOS_CACHE_KEY = 'em-bot-empleados';
+const EMPLEADOS_TTL_MS = 60 * 60 * 1000; // 1 hora
+let _empleadosCache = null;
+
+async function obtenerEmpleados() {
+  if (_empleadosCache) return _empleadosCache;
+
+  // Intentar leer del localStorage
+  try {
+    const raw = localStorage.getItem(EMPLEADOS_CACHE_KEY);
+    if (raw) {
+      const stored = JSON.parse(raw);
+      if (stored.ts && (Date.now() - stored.ts) < EMPLEADOS_TTL_MS) {
+        _empleadosCache = stored.empleados || [];
+        return _empleadosCache;
+      }
+    }
+  } catch(e) {}
+
+  // Refrescar desde el Worker
+  try {
+    const r = await fetch(WORKER_EMPLEADOS_URL);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const data = await r.json();
+    _empleadosCache = data.empleados || [];
+    localStorage.setItem(EMPLEADOS_CACHE_KEY,
+      JSON.stringify({ ts: Date.now(), empleados: _empleadosCache }));
+    return _empleadosCache;
+  } catch(e) {
+    console.warn('No se pudieron cargar empleados:', e.message);
+    return [];
+  }
+}
+
+/* ============================================================
+   MODAL DE FILTROS — abrir, prefill, cerrar, ejecutar
+   ============================================================ */
+let _comandoActivo = null;
+
+function fechaISO(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return y + '-' + m + '-' + dd;
+}
+
+function fechaDDMM(iso) {
+  // 2026-05-15 → 15/05/2026
+  const p = iso.split('-');
+  return p[2] + '/' + p[1] + '/' + p[0];
+}
+
+function rangoQuick(quick) {
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  const ini = new Date(hoy);
+  const fin = new Date(hoy);
+
+  switch (quick) {
+    case 'hoy':
+      // sin cambio
+      break;
+    case 'ayer':
+      ini.setDate(ini.getDate() - 1);
+      fin.setDate(fin.getDate() - 1);
+      break;
+    case 'manana':
+      ini.setDate(ini.getDate() + 1);
+      fin.setDate(fin.getDate() + 1);
+      break;
+    case 'esta-semana':
+      // Lunes a domingo de esta semana
+      const diaSem = hoy.getDay() || 7; // 0=domingo → 7
+      ini.setDate(hoy.getDate() - (diaSem - 1));
+      fin.setDate(ini.getDate() + 6);
+      break;
+    case 'este-mes':
+      ini.setDate(1);
+      fin.setMonth(fin.getMonth() + 1, 0); // último día del mes
+      break;
+    case 'mes-pasado':
+      ini.setMonth(ini.getMonth() - 1, 1);
+      fin.setMonth(fin.getMonth(), 0); // último día del mes pasado
+      break;
+    case 'quincena-actual':
+      if (hoy.getDate() <= 15) {
+        ini.setDate(1);
+        fin.setDate(15);
+      } else {
+        ini.setDate(16);
+        fin.setMonth(fin.getMonth() + 1, 0);
+      }
+      break;
+  }
+  return { ini: fechaISO(ini), fin: fechaISO(fin) };
+}
+
+function aplicarQuickDate(quick) {
+  const r = rangoQuick(quick);
+  document.getElementById('fecha-ini').value = r.ini;
+  document.getElementById('fecha-fin').value = r.fin;
+  // Toggle active state
+  document.querySelectorAll('.quick-dates button').forEach(b => {
+    b.classList.toggle('active', b.dataset.quick === quick);
+  });
+}
+
+async function abrirFiltros(comandoId) {
+  const cfg = COMANDOS[comandoId];
+  if (!cfg) { console.warn('Comando no configurado:', comandoId); return; }
+
+  _comandoActivo = comandoId;
+  cerrarSidebarSiMobile();
+
+  // Título y ícono
+  document.getElementById('modal-titulo').innerHTML =
+    '<i class="fas ' + cfg.icono + '"></i><span>' + cfg.titulo + '</span>';
+
+  // Mostrar/ocultar secciones según el comando
+  const showFechas   = !!cfg.filtros.fechas;
+  const showEmpleado = !!cfg.filtros.empleado;
+  const showSku      = !!cfg.filtros.sku;
+
+  document.getElementById('seccion-fechas').style.display   = showFechas   ? '' : 'none';
+  document.getElementById('seccion-empleado').style.display = showEmpleado ? '' : 'none';
+  document.getElementById('seccion-sku').style.display      = showSku      ? '' : 'none';
+
+  // Prefill fechas con MES ACTUAL si aplica
+  if (showFechas) aplicarQuickDate('este-mes');
+
+  // Limpiar empleado y sku
+  if (showEmpleado) document.getElementById('empleado-input').value = '';
+  if (showSku)      document.getElementById('sku-input').value = '';
+
+  // Si necesita empleado, asegurar que la lista esté cargada
+  if (showEmpleado) {
+    const hint = document.getElementById('empleado-hint');
+    hint.textContent = 'Cargando lista...';
+    obtenerEmpleados().then(emps => {
+      const dl = document.getElementById('empleados-dl');
+      dl.innerHTML = emps.map(n => '<option value="'+n.replace(/"/g,'&quot;')+'">').join('');
+      hint.textContent = emps.length
+        ? emps.length + ' empleados disponibles · escribe para buscar'
+        : '(no se pudo cargar la lista)';
+    });
+  }
+
+  // Mostrar modal y enfocar primer input
+  const modal = document.getElementById('modal-filtros');
+  modal.classList.add('active');
+
+  setTimeout(() => {
+    if (showSku)         document.getElementById('sku-input').focus();
+    else if (showEmpleado) document.getElementById('empleado-input').focus();
+    else if (showFechas) document.getElementById('fecha-ini').focus();
+  }, 200);
+}
+
+function cerrarFiltros() {
+  document.getElementById('modal-filtros').classList.remove('active');
+  _comandoActivo = null;
+}
+
+function cerrarFiltrosBackdrop(ev) {
+  // Solo cerrar si se clickeó fuera del panel (en el overlay)
+  if (ev.target === ev.currentTarget) cerrarFiltros();
+}
+
+function consultarConFiltros() {
+  if (!_comandoActivo) return;
+  const cfg = COMANDOS[_comandoActivo];
+  if (!cfg) return;
+
+  // Recolectar valores
+  const filtros = {};
+
+  if (cfg.filtros.fechas) {
+    const ini = document.getElementById('fecha-ini').value;
+    const fin = document.getElementById('fecha-fin').value;
+    if (!ini || !fin) {
+      alert('Selecciona el periodo de fechas.');
+      return;
+    }
+    if (ini > fin) {
+      alert('La fecha "Desde" no puede ser mayor que "Hasta".');
+      return;
+    }
+    filtros.fechaIni = fechaDDMM(ini);
+    filtros.fechaFin = fechaDDMM(fin);
+  }
+
+  if (cfg.filtros.empleado) {
+    filtros.empleado = document.getElementById('empleado-input').value.trim();
+  }
+
+  if (cfg.filtros.sku) {
+    filtros.sku = document.getElementById('sku-input').value.trim();
+  }
+
+  // Validar campos requeridos
+  if (cfg.requiere) {
+    for (const campo of cfg.requiere) {
+      if (!filtros[campo]) {
+        alert('Debes llenar el campo de búsqueda.');
+        return;
+      }
+    }
+  }
+
+  const comando = cfg.build(filtros).trim().replace(/\s+/g, ' ');
+  cerrarFiltros();
+  sendMessage(comando);
+}
+
+// Bind de quick dates
+document.querySelectorAll('.quick-dates button').forEach(b => {
+  b.addEventListener('click', () => aplicarQuickDate(b.dataset.quick));
+});
+
+// ESC para cerrar
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    const m = document.getElementById('modal-filtros');
+    if (m && m.classList.contains('active')) cerrarFiltros();
+  }
+});
+
+// Enter en inputs del modal → consultar
+['sku-input','empleado-input','fecha-ini','fecha-fin'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      consultarConFiltros();
+    }
+  });
+});
 
 /* ============================================================
    PWA: BOTÓN INSTALAR
@@ -1291,6 +1931,8 @@ window.addEventListener('load', () => {
   actualizarReloj();
   setInterval(actualizarReloj, 1000);
   procesarQueryParam();
+  // Precargar empleados en background para que el modal abra rápido
+  obtenerEmpleados();
   if (window.innerWidth > 768) messageInput.focus();
 });
 </script>
