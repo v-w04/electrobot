@@ -413,6 +413,29 @@ body.girly-mode .pulse-indicator::before { background: #BA8FFF; }
   align-items: center;
   animation: slideInUp 0.6s ease-out 0.2s both;
 }
+/* Slot que recibe el composer en la pantalla de bienvenida */
+#composer-slot-welcome {
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto 18px;
+}
+#composer-slot-welcome:empty { display: none; }
+/* Cuando el composer-inner vive dentro del welcome, se ve como una caja
+   destacada (input prominente, no como barra inferior). */
+#composer-slot-welcome .composer-inner {
+  max-width: 100%;
+  padding: 0;
+}
+#composer-slot-welcome .composer-input-wrap {
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(56, 189, 248, 0.4) !important;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.06);
+}
+/* Composer de abajo oculto durante la bienvenida */
+.composer.hidden { display: none; }
+/* Ajuste de scroll en welcome cuando el composer está arriba: el chat-main
+   puede scrollear todo el welcome si los atajos no caben. */
+body.composer-on-top .chat-main { padding-bottom: 16px; }
 /* Avatar del bot con borde brillante tipo MSN */
 .welcome-avatar {
   width: 84px; height: 84px;
@@ -981,7 +1004,7 @@ body.girly-mode .date-field input:focus {
 .mobile-menu-btn {
   display: none;
   position: fixed;
-  top: 14px; left: 14px;
+  top: 18px; left: 18px;
   z-index: 300;
   width: 40px; height: 40px;
   border-radius: 11px;
@@ -1002,8 +1025,8 @@ body.girly-mode .mobile-menu-btn {
 .sidebar-overlay {
   display: none;
   position: fixed; inset: 0;
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(2px);
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
   z-index: 150;
   animation: modalFadeIn 0.2s ease;
 }
@@ -1025,8 +1048,12 @@ body.girly-mode .mobile-menu-btn {
   .sidebar {
     transform: translateX(-100%);
     width: 300px;
-    background: rgba(15, 23, 42, 0.98) !important;
-    backdrop-filter: blur(20px) !important;
+    /* SÓLIDO en móvil: sin transparencia ni blur (eso lo hacía verse borroso).
+       El overlay aparte oscurece el fondo; el sidebar va NÍTIDO encima. */
+    background: #0F172A !important;
+    backdrop-filter: none !important;
+    box-shadow: 8px 0 24px rgba(0, 0, 0, 0.5);
+    z-index: 200;
   }
   .sidebar.active { transform: translateX(0); }
   .sidebar-overlay.active { display: block; }
@@ -1036,7 +1063,7 @@ body.girly-mode .mobile-menu-btn {
      El padding-left abre hueco para el botón (44px + aire). */
   .topbar {
     margin: 10px 10px 8px;
-    padding: 10px 14px 10px 64px;
+    padding: 10px 14px 10px 70px;
     border-radius: 12px;
   }
   .topbar-left { gap: 10px; }
@@ -1053,12 +1080,27 @@ body.girly-mode .mobile-menu-btn {
   .composer-inner { gap: 8px; }
   .send-btn { width: 42px; height: 42px; flex-shrink: 0; }
 
-  .suggestions { grid-template-columns: 1fr 1fr; gap: 8px; max-width: 100%; }
-  .suggestion { padding: 11px 12px; font-size: calc(12px * var(--fs)); }
-  .welcome-card { padding: 16px 8px 10px; }
-  .welcome-emoji { font-size: calc(38px * var(--fs)); margin-bottom: 8px; }
-  .welcome-title { font-size: calc(17px * var(--fs)); }
-  .welcome-subtitle { font-size: calc(12px * var(--fs)); margin-bottom: 14px; }
+  .suggestions { grid-template-columns: 1fr 1fr; gap: 10px; max-width: 100%; }
+  .suggestion { padding: 12px 13px; min-height: 64px; }
+  .suggestion .sg-icon { width: 40px; height: 40px; border-radius: 11px; }
+  /* Subtítulo en 2 líneas si no cabe, en vez de cortarse con "..." */
+  .suggestion .sg-sub {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .welcome-card { padding: 14px 10px 10px; }
+  .welcome-avatar {
+    width: 60px; height: 60px;
+    margin: 0 auto 10px;
+    font-size: calc(28px * var(--fs));
+  }
+  .welcome-emoji { font-size: calc(34px * var(--fs)); margin-bottom: 6px; }
+  .welcome-title { font-size: calc(17px * var(--fs)); margin-bottom: 2px; }
+  .welcome-subtitle { font-size: calc(11px * var(--fs)); margin-bottom: 12px; }
+  #composer-slot-welcome { margin-bottom: 14px; }
   .message { max-width: 92%; gap: 8px; }
   .msg-avatar { width: 28px; height: 28px; font-size: calc(12px * var(--fs)); }
   .msg-bubble { padding: 9px 12px; font-size: calc(13px * var(--fs)); border-radius: 12px; }
@@ -1328,14 +1370,16 @@ body.girly-mode .typing span { background: #BA8FFF; }
             <div class="welcome-avatar"><i class="fas fa-robot"></i></div>
             <div class="welcome-title">¿En qué puedo ayudarte?</div>
             <div class="welcome-subtitle">Escribe una pregunta o toca un atajo</div>
+            <!-- Slot donde aterriza el composer en pantalla de bienvenida -->
+            <div id="composer-slot-welcome"></div>
             <div class="suggestions" id="suggestions"></div>
           </div>
         </div>
       </div>
 
-      <!-- Composer -->
-      <div class="composer">
-        <div class="composer-inner">
+      <!-- Composer (su sitio normal, abajo) -->
+      <div class="composer" id="composer-bottom">
+        <div class="composer-inner" id="composer-inner">
           <div class="composer-input-wrap">
             <textarea id="message-input"
                       placeholder="Pregúntame algo..."
@@ -2088,8 +2132,29 @@ function autoResize() {
   messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + 'px';
 }
 
+/* ============================================================
+   POSICIÓN DEL COMPOSER — arriba en welcome, abajo al chatear
+   ============================================================ */
+function posicionarComposer(modo) {
+  // modo: 'welcome' (en la pantalla inicial) | 'bottom' (al chatear)
+  const inner    = document.getElementById('composer-inner');
+  const slotWel  = document.getElementById('composer-slot-welcome');
+  const composer = document.getElementById('composer-bottom');
+  if (!inner || !slotWel || !composer) return;
+  if (modo === 'welcome') {
+    if (inner.parentElement !== slotWel) slotWel.appendChild(inner);
+    composer.classList.add('hidden');
+    document.body.classList.add('composer-on-top');
+  } else {
+    if (inner.parentElement !== composer) composer.appendChild(inner);
+    composer.classList.remove('hidden');
+    document.body.classList.remove('composer-on-top');
+  }
+}
+
 function hideWelcome() {
   if (welcomeCard) welcomeCard.style.display = 'none';
+  posicionarComposer('bottom');
 }
 
 function addUserMessage(text) {
@@ -2195,6 +2260,7 @@ function limpiarChat() {
   });
   if (welcomeCard) welcomeCard.style.display = '';
   renderAtajos();
+  posicionarComposer('welcome');
   if (window.innerWidth > 768) messageInput.focus();
 }
 
@@ -2288,6 +2354,7 @@ window.addEventListener('load', () => {
   actualizarReloj();
   setInterval(actualizarReloj, 1000);
   renderAtajos();
+  posicionarComposer('welcome');
   procesarQueryParam();
   // Precargar empleados en background para que el modal abra rápido
   obtenerEmpleados();
