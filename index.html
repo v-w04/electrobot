@@ -548,6 +548,101 @@ body.composer-on-top .chat-main { padding-bottom: 16px; }
 }
 .suggestion:active { transform: translateY(-1px) scale(0.985); }
 
+/* Variante: atajo de GUÍA — se distingue visualmente del atajo "ejecuta ya".
+   Acento púrpura para diferenciarlo del azul de los atajos de consulta. */
+.suggestion-guide {
+  background: linear-gradient(180deg, rgba(167,139,250,0.10), rgba(30,41,59,0.55));
+  border-color: rgba(167, 139, 250, 0.32) !important;
+}
+.suggestion-guide .sg-icon {
+  background: linear-gradient(135deg, #8B5CF6, #A78BFA);
+  box-shadow: 0 3px 8px rgba(167,139,250,0.45), inset 0 1px 2px rgba(255,255,255,0.4);
+}
+.suggestion-guide:hover {
+  border-color: rgba(167,139,250,0.65) !important;
+  background: linear-gradient(180deg, rgba(167,139,250,0.18), rgba(30,41,59,0.65));
+  box-shadow: 0 8px 22px rgba(167,139,250,0.30), inset 0 1px 0 rgba(255,255,255,0.14);
+}
+
+/* Burbuja de GUÍA — mensaje del bot con explicación + ejemplos + filtros */
+.guide-bubble {
+  background: linear-gradient(180deg, rgba(167,139,250,0.10), rgba(30,41,59,0.7)) !important;
+  border: 1px solid rgba(167, 139, 250, 0.35) !important;
+  max-width: 560px;
+}
+.guide-title {
+  font-size: calc(15px * var(--fs));
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+}
+.guide-intro {
+  font-size: calc(13px * var(--fs));
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 12px;
+}
+.guide-intro code {
+  background: rgba(167,139,250,0.15);
+  padding: 1px 6px;
+  border-radius: 5px;
+  color: #C4B5FD;
+  font-family: 'Helvetica Neue', monospace;
+  font-size: 0.95em;
+}
+.guide-examples {
+  display: flex; flex-direction: column; gap: 6px;
+  margin-bottom: 12px;
+}
+.guide-example {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  padding: 9px 12px;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(167,139,250,0.22) !important;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: all 0.18s;
+  text-align: left;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif !important;
+}
+.guide-example:hover {
+  background: rgba(167,139,250,0.18);
+  border-color: rgba(167,139,250,0.55) !important;
+  transform: translateX(2px);
+}
+.guide-example-label {
+  font-size: calc(12.5px * var(--fs));
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.guide-example code {
+  font-size: calc(11px * var(--fs));
+  color: #C4B5FD;
+  background: transparent;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif !important;
+  opacity: 0.85;
+}
+.guide-filter-btn {
+  width: 100%;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, #8B5CF6, #A78BFA);
+  border: none !important;
+  border-radius: 10px;
+  color: white;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif !important;
+  font-size: calc(13px * var(--fs));
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(167,139,250,0.35), inset 0 1px 0 rgba(255,255,255,0.2);
+  transition: all 0.2s;
+}
+.guide-filter-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(167,139,250,0.5), inset 0 1px 0 rgba(255,255,255,0.25);
+}
+.guide-filter-btn:active { transform: translateY(0) scale(0.98); }
+
 /* Mensajes — proporción más natural */
 .message {
   display: flex; gap: 10px;
@@ -2287,42 +2382,107 @@ document.querySelectorAll('.suggestion').forEach(b => {
 });
 
 /* ============================================================
-   ATAJOS DE BIENVENIDA — pool + rotación aleatoria (MSN style)
+   ATAJOS DE BIENVENIDA
+   Tipos:
+   - 'query' (default): dispara un comando concreto YA con filtros del momento.
+   - 'guide':  muestra una mini-guía en el chat con ejemplos clickeables y
+               un botón para abrir el modal de filtros del módulo.
    ============================================================ */
 const POOL_ATAJOS = [
-  { q: 'ayuda',                 icon: 'fa-circle-info',          title: 'Ayuda',            sub: 'Ver todos los comandos' },
-  { q: 'stock 4699',            icon: 'fa-boxes-stacked',        title: 'Buscar stock',     sub: 'Inventario por SKU' },
-  { q: 'stock',                 icon: 'fa-warehouse',            title: 'Inventario',       sub: 'Stock general' },
-  { q: 'sobreventa',            icon: 'fa-triangle-exclamation', title: 'Sobreventa',       sub: 'Stock en negativo' },
-  { q: 'por recibir',           icon: 'fa-truck',                title: 'Por recibir',      sub: 'Mercancía en camino' },
-  { q: 'traslados',             icon: 'fa-right-left',           title: 'Traslados',        sub: 'Entre sucursales' },
-  { q: 'bono puntualidad',      icon: 'fa-trophy',               title: 'Bono puntualidad', sub: 'Quién lo gana' },
-  { q: 'retardos',              icon: 'fa-clock',                title: 'Retardos',         sub: 'Llegadas tarde' },
-  { q: 'retardos hoy',          icon: 'fa-hourglass-half',       title: 'Retardos de hoy',  sub: 'Del día' },
-  { q: 'faltas',                icon: 'fa-user-xmark',           title: 'Faltas',           sub: 'Ausencias del periodo' },
-  { q: 'faltas hoy',            icon: 'fa-calendar-xmark',       title: 'Faltas de hoy',    sub: 'Del día' },
-  { q: 'checador',              icon: 'fa-fingerprint',          title: 'Checador hoy',     sub: 'Asistencia del día' },
-  { q: 'asistencia',            icon: 'fa-user-check',           title: 'Asistencia',       sub: 'Registro de entradas' },
-  { q: 'vacaciones',            icon: 'fa-umbrella-beach',       title: 'Vacaciones',       sub: 'Quién está de vacaciones' },
-  { q: 'vacaciones semana siguiente', icon: 'fa-calendar-week',  title: 'Vacaciones próximas', sub: 'Semana siguiente' },
-  { q: 'vacaciones mes siguiente',    icon: 'fa-calendar-days',  title: 'Vacaciones del mes',  sub: 'Mes siguiente' },
-  { q: 'enfermedades',          icon: 'fa-notes-medical',        title: 'Enfermedades',     sub: 'Permisos médicos' },
-  { q: 'gym',                   icon: 'fa-dumbbell',             title: 'Gym',              sub: 'Beneficio de gimnasio' },
-  { q: 'precios erroneos',      icon: 'fa-tag',                  title: 'Precios erróneos', sub: 'Detectar errores' },
-  { q: 'vendedores',            icon: 'fa-user-tie',             title: 'Vendedores',       sub: 'Asignación incorrecta' },
-  { q: 'ventiapp',              icon: 'fa-store',                title: 'Ventiapp',         sub: 'Analítica marketplace' },
-  { q: 'killers',               icon: 'fa-crosshairs',           title: 'Killers',          sub: 'Productos urgentes' },
-  { q: 'turno',                 icon: 'fa-business-time',        title: 'Turnos',           sub: 'Horarios del personal' },
-  { q: 'bono',                  icon: 'fa-medal',                title: 'Bonos',            sub: 'Resumen general' },
-  { q: 'puntuales',             icon: 'fa-circle-check',         title: 'Puntuales',        sub: 'Llegadas a tiempo' }
+  // ── HOY / DEL MOMENTO (lo que más se consulta a diario) ───────
+  { q: 'checador hoy',                icon: 'fa-fingerprint',          title: 'Asistencia de hoy',     sub: 'Quién vino, faltó o llegó tarde' },
+  { q: 'retardos hoy',                icon: 'fa-hourglass-half',       title: 'Retardos de hoy',       sub: 'Llegadas tarde del día' },
+  { q: 'faltas hoy',                  icon: 'fa-calendar-xmark',       title: 'Faltas de hoy',         sub: 'Ausentes del día' },
+  { q: 'puntuales hoy',               icon: 'fa-circle-check',         title: 'Puntuales hoy',         sub: 'Llegaron a tiempo' },
+  { q: 'vacaciones',                  icon: 'fa-umbrella-beach',       title: 'De vacaciones hoy',     sub: 'Quién no viene' },
+  { q: 'enfermedades hoy',            icon: 'fa-notes-medical',        title: 'Permisos de hoy',       sub: 'Médicos / personales' },
+
+  // ── SEMANA / MES (rangos útiles) ──────────────────────────────
+  { q: 'retardos esta semana',        icon: 'fa-clock',                title: 'Retardos esta semana',  sub: 'Acumulado semanal' },
+  { q: 'faltas esta semana',          icon: 'fa-user-xmark',           title: 'Faltas esta semana',    sub: 'Acumulado semanal' },
+  { q: 'vacaciones semana siguiente', icon: 'fa-calendar-week',        title: 'Vacaciones próximas',   sub: 'Semana siguiente' },
+  { q: 'vacaciones mes siguiente',    icon: 'fa-calendar-days',        title: 'Vacaciones del mes',    sub: 'Mes que viene' },
+  { q: 'retardos mes pasado',         icon: 'fa-clock-rotate-left',    title: 'Retardos mes pasado',   sub: 'Cierre del mes' },
+
+  // ── ALERTAS / OPERACIÓN ───────────────────────────────────────
+  { q: 'sobreventa',                  icon: 'fa-triangle-exclamation', title: 'Sobreventa',            sub: 'Stock en negativo' },
+  { q: 'por recibir',                 icon: 'fa-truck',                title: 'Por recibir',           sub: 'Mercancía en camino' },
+  { q: 'killers',                     icon: 'fa-crosshairs',           title: 'Productos killers',     sub: 'Urgentes de revisar' },
+  { q: 'precios erroneos',            icon: 'fa-tag',                  title: 'Precios erróneos',      sub: 'Errores a corregir' },
+  { q: 'vendedores',                  icon: 'fa-user-tie',             title: 'Vendedores',            sub: 'Asignación incorrecta' },
+
+  // ── BONO / GYM (revisión rápida) ──────────────────────────────
+  { q: 'bono puntualidad',            icon: 'fa-trophy',               title: 'Bono puntualidad',      sub: 'Quién lo gana este mes' },
+  { q: 'gym',                         icon: 'fa-dumbbell',             title: 'Registro de gym',       sub: 'Beneficio del mes' },
+
+  // ── GUÍAS CONVERSACIONALES ────────────────────────────────────
+  { type: 'guide', id: 'mis_vacaciones', icon: 'fa-question',          title: '¿Cómo veo mis vacaciones?', sub: 'Te explico cómo buscarte' },
+  { type: 'guide', id: 'mi_asistencia',  icon: 'fa-question',          title: '¿Cómo veo mi asistencia?',  sub: 'Tu resumen personal' },
+  { type: 'guide', id: 'buscar_stock',   icon: 'fa-question',          title: '¿Cómo busco un producto?',  sub: 'Stock por SKU o nombre' },
+  { type: 'guide', id: 'ventiapp_ayuda', icon: 'fa-question',          title: '¿Para qué sirve Ventiapp?', sub: 'Analítica del marketplace' },
+
+  // ── AYUDA GENERAL ─────────────────────────────────────────────
+  { q: 'ayuda',                       icon: 'fa-circle-info',          title: 'Ver todos los comandos', sub: 'Lista completa de funciones' }
 ];
+
+/* ============================================================
+   GUÍAS — contenido conversacional por id
+   Cada guía: título, intro, ejemplos clickeables y comando para
+   abrir el modal de filtros del sidebar (opcional).
+   ============================================================ */
+const GUIAS = {
+  mis_vacaciones: {
+    titulo: '🏖️ Cómo ver tus vacaciones',
+    intro: 'Puedes consultar las vacaciones de cualquier empleado por nombre. Para verte a ti, escribe tu nombre después del comando — basta con tu primer nombre o apellido (sin acentos importa).',
+    ejemplos: [
+      { cmd: 'vacaciones Victor',                 label: '• Vacaciones de Victor' },
+      { cmd: 'vacaciones Samantha mes siguiente', label: '• Samantha · mes siguiente' },
+      { cmd: 'vacaciones Jasso semana siguiente', label: '• Jasso · semana siguiente' }
+    ],
+    filtroId: 'vacaciones',
+    filtroLabel: 'Abrir filtros de vacaciones'
+  },
+  mi_asistencia: {
+    titulo: '✅ Cómo ver tu asistencia',
+    intro: 'Usa <code>asistencia [tu nombre]</code> para tu historial individual, o <code>resumen [tu nombre]</code> para un balance del mes (asistencias, retardos, faltas, bono).',
+    ejemplos: [
+      { cmd: 'asistencia Victor',             label: '• Mi asistencia reciente' },
+      { cmd: 'resumen Victor',                label: '• Mi resumen del mes' },
+      { cmd: 'asistencia Victor mes pasado',  label: '• Mes pasado' }
+    ],
+    filtroId: 'asistencia',
+    filtroLabel: 'Abrir filtros de asistencia'
+  },
+  buscar_stock: {
+    titulo: '📦 Cómo buscar un producto',
+    intro: 'Escribe <code>stock</code> seguido del SKU, marca, modelo o palabra clave. El bot busca en todo el inventario.',
+    ejemplos: [
+      { cmd: 'stock 4699',     label: '• Por SKU exacto: stock 4699' },
+      { cmd: 'stock AMA-',     label: '• Por prefijo: stock AMA-' },
+      { cmd: 'stock JBL',      label: '• Por marca: stock JBL' }
+    ],
+    filtroId: 'stock',
+    filtroLabel: 'Abrir buscador de stock'
+  },
+  ventiapp_ayuda: {
+    titulo: '🛒 Para qué sirve Ventiapp',
+    intro: 'Ventiapp analiza tus marketplaces: productos urgentes (killers), falta de stock, errores de canal. Útil para revisar el día antes de operar.',
+    ejemplos: [
+      { cmd: 'ventiapp',  label: '• Resumen Ventiapp' },
+      { cmd: 'killers',   label: '• Productos urgentes' },
+      { cmd: 'sobreventa', label: '• Sobreventa actual' }
+    ],
+    filtroId: 'ventiapp',
+    filtroLabel: 'Abrir analítica Ventiapp'
+  }
+};
 
 function escAttr(s){ return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 function renderAtajos() {
   const cont = document.getElementById('suggestions');
   if (!cont) return;
-  // Barajar (Fisher-Yates) y tomar 10
+  // Barajar (Fisher-Yates)
   const pool = POOL_ATAJOS.slice();
   for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -2330,19 +2490,71 @@ function renderAtajos() {
   }
   const n = window.innerWidth <= 768 ? 12 : 20;
   const sel = pool.slice(0, n);
-  cont.innerHTML = sel.map(a =>
-    '<button class="suggestion" data-q="'+escAttr(a.q)+'">'+
+  cont.innerHTML = sel.map(a => {
+    const tipo = a.type || 'query';
+    const data = tipo === 'guide'
+      ? 'data-guide="'+escAttr(a.id)+'"'
+      : 'data-q="'+escAttr(a.q)+'"';
+    const cls = tipo === 'guide' ? 'suggestion suggestion-guide' : 'suggestion';
+    return '<button class="'+cls+'" '+data+'>'+
       '<span class="sg-icon"><i class="fas '+a.icon+'"></i></span>'+
       '<span class="sg-text">'+
         '<span class="sg-title">'+escAttr(a.title)+'</span>'+
         '<span class="sg-sub">'+escAttr(a.sub)+'</span>'+
       '</span>'+
-    '</button>'
-  ).join('');
-  // Enganchar clics
+    '</button>';
+  }).join('');
+  // Enganchar clics: guías → mostrarGuia, queries → sendMessage
   cont.querySelectorAll('.suggestion').forEach(b => {
+    b.addEventListener('click', () => {
+      if (b.dataset.guide)    mostrarGuia(b.dataset.guide);
+      else if (b.dataset.q)   sendMessage(b.dataset.q);
+    });
+  });
+}
+
+/* ============================================================
+   GUÍAS — pinta un mensaje del bot con explicación + ejemplos
+   ============================================================ */
+function mostrarGuia(id) {
+  const g = GUIAS[id];
+  if (!g) return;
+  hideWelcome();   // entra al modo chat (composer abajo)
+
+  // Construir burbuja del bot con ejemplos clickeables
+  const msg = document.createElement('div');
+  msg.className = 'message bot';
+
+  let html = '<div class="msg-avatar"><i class="fas fa-robot"></i></div>'+
+             '<div class="msg-bubble guide-bubble">'+
+               '<div class="guide-title">'+g.titulo+'</div>'+
+               '<div class="guide-intro">'+g.intro+'</div>'+
+               '<div class="guide-examples">';
+  g.ejemplos.forEach(ej => {
+    html += '<button class="guide-example" data-q="'+escAttr(ej.cmd)+'">'+
+              '<span class="guide-example-label">'+escAttr(ej.label)+'</span>'+
+              '<code>'+escAttr(ej.cmd)+'</code>'+
+            '</button>';
+  });
+  html += '</div>';
+  if (g.filtroId) {
+    html += '<button class="guide-filter-btn" data-filtro="'+escAttr(g.filtroId)+'">'+
+              '<i class="fas fa-sliders"></i> '+escAttr(g.filtroLabel || 'Abrir filtros')+
+            '</button>';
+  }
+  html += '</div>';
+  msg.innerHTML = html;
+  chatContainer.appendChild(msg);
+
+  // Enganchar clics dentro de la guía
+  msg.querySelectorAll('.guide-example').forEach(b => {
     b.addEventListener('click', () => sendMessage(b.dataset.q));
   });
+  const btnFiltro = msg.querySelector('.guide-filter-btn');
+  if (btnFiltro) {
+    btnFiltro.addEventListener('click', () => abrirFiltros(btnFiltro.dataset.filtro));
+  }
+  scrollToBottom();
 }
 
 /* ============================================================
