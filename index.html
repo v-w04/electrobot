@@ -2409,7 +2409,8 @@ const POOL_ATAJOS = [
   { q: 'por recibir',                 icon: 'fa-truck',                title: 'Por recibir',           sub: 'Mercancía en camino' },
   { q: 'killers',                     icon: 'fa-crosshairs',           title: 'Productos killers',     sub: 'Urgentes de revisar' },
   { q: 'precios erroneos',            icon: 'fa-tag',                  title: 'Precios erróneos',      sub: 'Errores a corregir' },
-  { q: 'vendedores',                  icon: 'fa-user-tie',             title: 'Vendedores',            sub: 'Asignación incorrecta' },
+  { q: 'vendedores incorrectos',      icon: 'fa-user-tie',             title: 'Vendedores incorrectos',sub: 'Asignación errada' },
+  { q: 'sin publicar urgente',        icon: 'fa-bullhorn',             title: 'Sin publicar urgente',  sub: 'Productos por publicar' },
 
   // ── BONO / GYM (revisión rápida) ──────────────────────────────
   { q: 'bono puntualidad',            icon: 'fa-trophy',               title: 'Bono puntualidad',      sub: 'Quién lo gana este mes' },
@@ -2418,7 +2419,9 @@ const POOL_ATAJOS = [
   // ── GUÍAS CONVERSACIONALES ────────────────────────────────────
   { type: 'guide', id: 'mis_vacaciones', icon: 'fa-question',          title: '¿Cómo veo mis vacaciones?', sub: 'Te explico cómo buscarte' },
   { type: 'guide', id: 'mi_asistencia',  icon: 'fa-question',          title: '¿Cómo veo mi asistencia?',  sub: 'Tu resumen personal' },
+  { type: 'guide', id: 'mi_checador',    icon: 'fa-question',          title: '¿Cómo uso el checador?',    sub: 'Asistencia y rangos' },
   { type: 'guide', id: 'buscar_stock',   icon: 'fa-question',          title: '¿Cómo busco un producto?',  sub: 'Stock por SKU o nombre' },
+  { type: 'guide', id: 'buscar_bodega',  icon: 'fa-question',          title: '¿Cómo busco en bodega?',    sub: 'Stock por sucursal' },
   { type: 'guide', id: 'ventiapp_ayuda', icon: 'fa-question',          title: '¿Para qué sirve Ventiapp?', sub: 'Analítica del marketplace' },
 
   // ── AYUDA GENERAL ─────────────────────────────────────────────
@@ -2455,14 +2458,34 @@ const GUIAS = {
   },
   buscar_stock: {
     titulo: '📦 Cómo buscar un producto',
-    intro: 'Escribe <code>stock</code> seguido del SKU, marca, modelo o palabra clave. El bot busca en todo el inventario.',
+    intro: 'Escribe <code>stock</code> seguido del SKU, marca, modelo o palabra clave para buscar en inventario. Para buscar específicamente en bodegas, usa <code>bodega</code>.',
     ejemplos: [
-      { cmd: 'stock 4699',     label: '• Por SKU exacto: stock 4699' },
-      { cmd: 'stock AMA-',     label: '• Por prefijo: stock AMA-' },
-      { cmd: 'stock JBL',      label: '• Por marca: stock JBL' }
+      { cmd: 'stock 4699',       label: '• Por SKU exacto' },
+      { cmd: 'stock JBL',        label: '• Por marca' },
+      { cmd: 'bodega Samsung',   label: '• En bodega: bodega Samsung' }
     ],
     filtroId: 'stock',
     filtroLabel: 'Abrir buscador de stock'
+  },
+  buscar_bodega: {
+    titulo: '🏭 Cómo buscar en bodega',
+    intro: 'Usa <code>bodega</code> seguido del producto, SKU o código para ver disponibilidad por bodega/sucursal. Acepta múltiples términos con comas.',
+    ejemplos: [
+      { cmd: 'bodega 4699',        label: '• Por código de bodega' },
+      { cmd: 'bodega Samsung',     label: '• Por marca' },
+      { cmd: 'bodega Canon, HP',   label: '• Múltiples productos' }
+    ]
+  },
+  mi_checador: {
+    titulo: '📋 Cómo ver el checador',
+    intro: 'Usa <code>checador</code> para asistencia del día o agrega rango de fechas. En rango, el bot consolida por persona (asistencias, retardos, faltas, vacaciones).',
+    ejemplos: [
+      { cmd: 'checador hoy',                         label: '• Asistencia de hoy' },
+      { cmd: 'checador 16/05/2026 al 31/05/2026',    label: '• Rango con desglose' },
+      { cmd: 'faltas esta semana',                   label: '• Solo faltas semanales' }
+    ],
+    filtroId: 'asistencia',
+    filtroLabel: 'Abrir filtros de asistencia'
   },
   ventiapp_ayuda: {
     titulo: '🛒 Para qué sirve Ventiapp',
