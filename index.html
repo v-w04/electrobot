@@ -143,7 +143,7 @@ body {
    LAYOUT — sidebar + main content (idéntico a intranet)
    ============================================================ */
 .app-container {
-  display: flex; height: 100vh; position: relative; z-index: 1; overflow: visible;
+  display: flex; height: 100vh; height: 100dvh; position: relative; z-index: 1; overflow: visible;
 }
 
 .sidebar {
@@ -334,6 +334,8 @@ body.girly-mode .pulse-indicator::before { background: #BA8FFF; }
   flex: 1;
   margin-left: 280px;
   height: 100vh;
+  height: 100dvh;
+  min-height: 0;
   display: flex; flex-direction: column;
   overflow: hidden;
 }
@@ -376,6 +378,7 @@ body.girly-mode .pulse-indicator::before { background: #BA8FFF; }
 /* Chat area */
 .chat-frame {
   flex: 1;
+  min-height: 0;
   margin: 0 24px 20px;
   background: rgba(15, 23, 42, 0.5);
   border: 1px solid var(--border-color) !important;
@@ -399,64 +402,116 @@ body.girly-mode .pulse-indicator::before { background: #BA8FFF; }
   gap: 14px;
 }
 
-/* Welcome inicial */
+/* Welcome inicial — MSN / Frutiger Aero */
 .welcome-card {
   text-align: center;
-  padding: 32px 16px 16px;
+  padding: 8px 16px 24px;
+  min-height: 100%;
+  display: flex; flex-direction: column;
+  justify-content: center;   /* centra verticalmente, llena el vacío */
+  align-items: center;
   animation: slideInUp 0.6s ease-out 0.2s both;
 }
-.welcome-emoji {
-  font-size: 52px; margin-bottom: 14px;
-  filter: drop-shadow(0 8px 20px rgba(59, 130, 246, 0.4));
-  animation: livePulse 3s ease-in-out infinite;
+/* Avatar del bot con borde brillante tipo MSN */
+.welcome-avatar {
+  width: 84px; height: 84px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 40px;
+  background:
+    radial-gradient(circle at 35% 28%, rgba(255,255,255,0.35), transparent 55%),
+    linear-gradient(135deg, #1E293B, #0F172A);
+  border: 2px solid rgba(56, 189, 248, 0.55);
+  box-shadow:
+    0 0 0 4px rgba(56, 189, 248, 0.12),
+    0 0 28px rgba(56, 189, 248, 0.45),
+    inset 0 2px 8px rgba(255,255,255,0.12);
+  animation: avatarGlow 3.5s ease-in-out infinite;
+  position: relative;
+}
+@keyframes avatarGlow {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(56,189,248,0.12), 0 0 22px rgba(56,189,248,0.40), inset 0 2px 8px rgba(255,255,255,0.12); }
+  50%      { box-shadow: 0 0 0 5px rgba(56,189,248,0.18), 0 0 36px rgba(56,189,248,0.60), inset 0 2px 10px rgba(255,255,255,0.18); }
+}
+.welcome-emoji {  /* compat: por si queda algún emoji suelto */
+  font-size: 40px;
 }
 .welcome-title {
-  font-size: 22px; font-weight: 700;
+  font-size: 23px; font-weight: 700;
   margin-bottom: 6px; color: var(--text-primary);
+  letter-spacing: 0.2px;
 }
 .welcome-subtitle {
   color: var(--text-secondary);
-  font-size: 13px; margin-bottom: 24px;
+  font-size: 13px; margin-bottom: 26px;
 }
 
 .suggestions {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
-  gap: 10px;
-  max-width: 680px;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+  max-width: 760px;
+  width: 100%;
   margin: 0 auto;
 }
+/* Tarjeta de atajo: glossy, cristal Aero, ícono con volumen */
 .suggestion {
-  background: rgba(30, 41, 59, 0.6);
-  border: 1px solid var(--border-color) !important;
-  border-radius: 10px;
-  padding: 12px 14px;
+  position: relative;
+  background:
+    linear-gradient(180deg, rgba(56,189,248,0.10), rgba(30,41,59,0.55));
+  border: 1px solid rgba(56, 189, 248, 0.28) !important;
+  border-radius: 14px;
+  padding: 14px 15px;
   text-align: left;
   color: var(--text-primary);
   cursor: pointer;
-  transition: all 0.18s;
+  overflow: hidden;
+  transition: transform 0.2s cubic-bezier(0.34,1.4,0.64,1), box-shadow 0.2s, border-color 0.2s, background 0.2s;
   font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif !important;
-  font-size: 13px; font-weight: 600;
-  display: flex; align-items: center; gap: 10px;
+  display: flex; align-items: center; gap: 13px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.08);
   animation: slideInUp 0.4s ease-out backwards;
+  -webkit-tap-highlight-color: transparent;
 }
-.suggestion:nth-child(1) { animation-delay: 0.30s; }
-.suggestion:nth-child(2) { animation-delay: 0.35s; }
-.suggestion:nth-child(3) { animation-delay: 0.40s; }
-.suggestion:nth-child(4) { animation-delay: 0.45s; }
-.suggestion:nth-child(5) { animation-delay: 0.50s; }
-.suggestion:nth-child(6) { animation-delay: 0.55s; }
-.suggestion:nth-child(7) { animation-delay: 0.60s; }
-.suggestion:nth-child(8) { animation-delay: 0.65s; }
+/* Reflejo glossy superior tipo botón MSN */
+.suggestion::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 45%;
+  background: linear-gradient(180deg, rgba(255,255,255,0.16), rgba(255,255,255,0));
+  pointer-events: none;
+}
+/* Badge de ícono con volumen */
+.suggestion .sg-icon {
+  flex-shrink: 0;
+  width: 38px; height: 38px;
+  border-radius: 11px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; color: #fff;
+  background: linear-gradient(135deg, var(--primary), #38BDF8);
+  box-shadow: 0 3px 8px rgba(56,189,248,0.45), inset 0 1px 2px rgba(255,255,255,0.4);
+}
+.suggestion .sg-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.suggestion .sg-title { font-size: 13.5px; font-weight: 700; line-height: 1.2; }
+.suggestion .sg-sub { font-size: 11px; color: var(--text-secondary); line-height: 1.2;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.suggestion:nth-child(1) { animation-delay: 0.28s; }
+.suggestion:nth-child(2) { animation-delay: 0.33s; }
+.suggestion:nth-child(3) { animation-delay: 0.38s; }
+.suggestion:nth-child(4) { animation-delay: 0.43s; }
+.suggestion:nth-child(5) { animation-delay: 0.48s; }
+.suggestion:nth-child(6) { animation-delay: 0.53s; }
+.suggestion:nth-child(7) { animation-delay: 0.58s; }
+.suggestion:nth-child(8) { animation-delay: 0.63s; }
+.suggestion:nth-child(9) { animation-delay: 0.68s; }
+.suggestion:nth-child(10){ animation-delay: 0.73s; }
 .suggestion:hover {
-  background: rgba(59, 130, 246, 0.15);
-  border-color: var(--primary) !important;
-  color: white;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+  transform: translateY(-3px);
+  border-color: rgba(56,189,248,0.6) !important;
+  background: linear-gradient(180deg, rgba(56,189,248,0.18), rgba(30,41,59,0.65));
+  box-shadow: 0 8px 22px rgba(56,189,248,0.30), inset 0 1px 0 rgba(255,255,255,0.14);
 }
-.suggestion i { color: var(--primary); font-size: 13px; width: 16px; }
-.suggestion:hover i { color: white; }
+.suggestion:active { transform: translateY(-1px) scale(0.985); }
 
 /* Mensajes — proporción más natural */
 .message {
@@ -877,12 +932,35 @@ body.girly-mode .date-field input:focus {
 }
 
 @media (max-width: 480px) {
-  .modal-panel { max-height: 95vh; }
-  .modal-body { padding: 16px; }
-  .modal-header { padding: 14px 16px; }
-  .modal-footer { padding: 12px 16px; }
+  /* Modal estilo bottom-sheet: anclado abajo, más cómodo para el pulgar */
+  .modal-overlay { padding: 0; align-items: flex-end; }
+  .modal-panel {
+    max-width: 100%;
+    max-height: 92vh; max-height: 92dvh;
+    border-radius: 18px 18px 0 0;
+    border-bottom: none !important;
+    animation: sheetUp 0.28s cubic-bezier(0.34, 1.4, 0.64, 1);
+  }
+  .modal-header { padding: 16px 18px; }
+  .modal-header h3 { font-size: 16px; }
+  .modal-body { padding: 16px 18px; }
+  .modal-footer {
+    padding: 12px 18px calc(12px + env(safe-area-inset-bottom));
+    position: sticky; bottom: 0;
+    background: rgba(15, 23, 42, 0.95);
+  }
+  .modal-footer .btn-primary, .modal-footer .btn-secondary { flex: 1; justify-content: center; }
   .date-inputs { grid-template-columns: 1fr; }
-  .quick-dates button { font-size: 11px; padding: 7px 10px; }
+  .quick-dates { gap: 7px; }
+  .quick-dates button { font-size: 12px; padding: 9px 12px; flex: 1 1 auto; }
+  /* iOS hace zoom al enfocar inputs <16px; forzamos 16px en móvil */
+  .date-field input[type="date"],
+  .filter-section input[type="text"],
+  #message-input { font-size: 16px !important; }
+}
+@keyframes sheetUp {
+  from { opacity: 0.4; transform: translateY(100%); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 /* ============================================================
@@ -891,13 +969,13 @@ body.girly-mode .date-field input:focus {
 .mobile-menu-btn {
   display: none;
   position: fixed;
-  top: 16px; left: 16px;
+  top: 14px; left: 14px;
   z-index: 300;
-  width: 44px; height: 44px;
-  border-radius: 12px;
+  width: 40px; height: 40px;
+  border-radius: 11px;
   background: linear-gradient(135deg, var(--primary), var(--secondary));
   border: none !important;
-  color: white; font-size: 18px; cursor: pointer;
+  color: white; font-size: 17px; cursor: pointer;
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
   transition: all 0.3s;
   align-items: center; justify-content: center;
@@ -908,8 +986,30 @@ body.girly-mode .mobile-menu-btn {
   box-shadow: 0 4px 12px rgba(186, 143, 255, 0.5);
 }
 
+/* Overlay oscuro detrás del sidebar abierto (solo móvil) */
+.sidebar-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(2px);
+  z-index: 150;
+  animation: modalFadeIn 0.2s ease;
+}
+@media (min-width: 769px) {
+  .sidebar-overlay, .sidebar-overlay.active { display: none !important; }
+}
+
 @media (max-width: 768px) {
   .mobile-menu-btn { display: flex; }
+
+  /* En móvil la página NO hace scroll: el alto se fija al viewport dinámico
+     y solo .chat-main scrollea internamente. Así el composer queda SIEMPRE
+     visible abajo, sin tener que bajar a buscarlo. */
+  html, body {
+    height: 100vh; height: 100dvh;
+    overflow: hidden;
+    position: fixed; width: 100%;
+  }
   .sidebar {
     transform: translateX(-100%);
     width: 280px;
@@ -917,27 +1017,44 @@ body.girly-mode .mobile-menu-btn {
     backdrop-filter: blur(20px) !important;
   }
   .sidebar.active { transform: translateX(0); }
+  .sidebar-overlay.active { display: block; }
   .main-content { margin-left: 0 !important; padding-top: 0 !important; }
-  .topbar { margin: 64px 12px 10px; padding: 12px 16px; border-radius: 12px; }
-  .topbar-left h2 { font-size: 16px; }
+
+  /* Topbar compacto: deja sitio al botón hamburguesa sin desperdiciar altura.
+     El padding-left abre hueco para el botón (44px + aire). */
+  .topbar {
+    margin: 10px 10px 8px;
+    padding: 10px 14px 10px 64px;
+    border-radius: 12px;
+  }
+  .topbar-left { gap: 10px; }
+  .topbar-left h2 { font-size: 15px; line-height: 1.2; }
   .topbar-left p { font-size: 11px; }
-  .bot-avatar { width: 36px; height: 36px; font-size: 16px; }
+  .bot-avatar { width: 34px; height: 34px; font-size: 15px; }
+
+  /* Chat ocupa todo el espacio restante; composer queda pegado abajo */
   .chat-frame { margin: 0 8px 8px; border-radius: 12px; }
-  .chat-main { padding: 16px 12px; }
+  .chat-main { padding: 14px 12px; }
   .chat-container { gap: 12px; }
-  .composer { padding: 12px 12px 14px; }
+
+  .composer { padding: 10px 10px calc(10px + env(safe-area-inset-bottom)); }
   .composer-inner { gap: 8px; }
-  .send-btn { width: 40px; height: 40px; }
+  .send-btn { width: 42px; height: 42px; flex-shrink: 0; }
+
   .suggestions { grid-template-columns: 1fr 1fr; gap: 8px; max-width: 100%; }
   .suggestion { padding: 11px 12px; font-size: 12px; }
-  .welcome-card { padding: 20px 8px 12px; }
-  .welcome-emoji { font-size: 44px; margin-bottom: 10px; }
-  .welcome-title { font-size: 18px; }
-  .welcome-subtitle { font-size: 12px; margin-bottom: 18px; }
-  .message { max-width: 90%; gap: 8px; }
+  .welcome-card { padding: 16px 8px 10px; }
+  .welcome-emoji { font-size: 38px; margin-bottom: 8px; }
+  .welcome-title { font-size: 17px; }
+  .welcome-subtitle { font-size: 12px; margin-bottom: 14px; }
+  .message { max-width: 92%; gap: 8px; }
   .msg-avatar { width: 28px; height: 28px; font-size: 12px; }
   .msg-bubble { padding: 9px 12px; font-size: 13px; border-radius: 12px; }
-  .topbar-actions { display: none; }
+
+  /* Ayuda accesible: en vez de ocultarla, la dejamos como ícono compacto */
+  .topbar-actions { display: flex; }
+  .topbar-actions .topbar-btn { padding: 8px 10px; font-size: 0; gap: 0; }
+  .topbar-actions .topbar-btn i { font-size: 15px; }
 }
 
 /* ============================================================
@@ -1018,6 +1135,9 @@ body.girly-mode .typing span { background: #BA8FFF; }
   <i class="fas fa-bars"></i>
 </button>
 
+<!-- Overlay para cerrar el sidebar tocando fuera (solo móvil) -->
+<div id="sidebar-overlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
+
 <div class="app-container">
 
   <!-- ============================================================
@@ -1027,8 +1147,7 @@ body.girly-mode .typing span { background: #BA8FFF; }
 
     <!-- Logo -->
     <div class="logo-container">
-      <a href="https://script.google.com/macros/s/AKfycbx9y0Nr4thwHCAdQYaeHD_48gCukdPc4PvU8r10vh6RD_qbMRse4j1fReOZEQX2fcs9Wg/exec"
-         target="_blank" title="Ir a Electronics México - Intranet">
+      <a href="./" title="Bot Electronics México">
         <img src="https://i.imgur.com/cVfOQOW.jpeg" alt="Logo" class="logo-img">
       </a>
       <div class="logo-text">
@@ -1194,43 +1313,10 @@ body.girly-mode .typing span { background: #BA8FFF; }
       <div class="chat-main" id="chat-main">
         <div class="chat-container" id="chat-container">
           <div class="welcome-card" id="welcome-card">
-            <div class="welcome-emoji">🤖</div>
+            <div class="welcome-avatar"><i class="fas fa-robot"></i></div>
             <div class="welcome-title">¿En qué puedo ayudarte?</div>
-            <div class="welcome-subtitle">Escribe una pregunta o usa uno de estos atajos</div>
-            <div class="suggestions">
-              <button class="suggestion" data-q="ayuda">
-                <i class="fas fa-circle-info"></i>
-                <span>Ayuda</span>
-              </button>
-              <button class="suggestion" data-q="stock 4699">
-                <i class="fas fa-boxes-stacked"></i>
-                <span>Buscar stock</span>
-              </button>
-              <button class="suggestion" data-q="venta hoy">
-                <i class="fas fa-chart-line"></i>
-                <span>Ventas de hoy</span>
-              </button>
-              <button class="suggestion" data-q="sobreventa">
-                <i class="fas fa-triangle-exclamation"></i>
-                <span>Sobreventa</span>
-              </button>
-              <button class="suggestion" data-q="bono puntualidad">
-                <i class="fas fa-trophy"></i>
-                <span>Bono puntualidad</span>
-              </button>
-              <button class="suggestion" data-q="retardos">
-                <i class="fas fa-clock"></i>
-                <span>Retardos</span>
-              </button>
-              <button class="suggestion" data-q="checador">
-                <i class="fas fa-fingerprint"></i>
-                <span>Checador hoy</span>
-              </button>
-              <button class="suggestion" data-q="gym">
-                <i class="fas fa-dumbbell"></i>
-                <span>Gym</span>
-              </button>
-            </div>
+            <div class="welcome-subtitle">Escribe una pregunta o toca un atajo</div>
+            <div class="suggestions" id="suggestions"></div>
           </div>
         </div>
       </div>
@@ -1939,11 +2025,16 @@ function aplicarGirlyGuardado() {
    MOBILE MENU
    ============================================================ */
 function toggleSidebar() {
-  document.getElementById('sidebar').classList.toggle('active');
+  const sb = document.getElementById('sidebar');
+  const ov = document.getElementById('sidebar-overlay');
+  const abierto = sb.classList.toggle('active');
+  if (ov) ov.classList.toggle('active', abierto);
 }
 function cerrarSidebarSiMobile() {
   if (window.innerWidth <= 768) {
     document.getElementById('sidebar').classList.remove('active');
+    const ov = document.getElementById('sidebar-overlay');
+    if (ov) ov.classList.remove('active');
   }
 }
 
@@ -2091,6 +2182,7 @@ function limpiarChat() {
     if (c.id !== 'welcome-card') c.remove();
   });
   if (welcomeCard) welcomeCard.style.display = '';
+  renderAtajos();
   if (window.innerWidth > 768) messageInput.focus();
 }
 
@@ -2117,6 +2209,58 @@ document.querySelectorAll('.suggestion').forEach(b => {
 });
 
 /* ============================================================
+   ATAJOS DE BIENVENIDA — pool + rotación aleatoria (MSN style)
+   ============================================================ */
+const POOL_ATAJOS = [
+  { q: 'ayuda',                 icon: 'fa-circle-info',          title: 'Ayuda',           sub: 'Ver todos los comandos' },
+  { q: 'stock 4699',            icon: 'fa-boxes-stacked',        title: 'Buscar stock',    sub: 'Inventario por SKU' },
+  { q: 'venta hoy',             icon: 'fa-chart-line',           title: 'Ventas de hoy',   sub: 'Resumen del día' },
+  { q: 'sobreventa',            icon: 'fa-triangle-exclamation', title: 'Sobreventa',      sub: 'Stock en negativo' },
+  { q: 'por recibir',           icon: 'fa-truck',                title: 'Por recibir',     sub: 'Mercancía en camino' },
+  { q: 'traslados',             icon: 'fa-right-left',           title: 'Traslados',       sub: 'Entre sucursales' },
+  { q: 'bono puntualidad',      icon: 'fa-trophy',               title: 'Bono puntualidad',sub: 'Quién lo gana' },
+  { q: 'retardos',              icon: 'fa-clock',                title: 'Retardos',        sub: 'Llegadas tarde' },
+  { q: 'faltas',                icon: 'fa-user-xmark',           title: 'Faltas',          sub: 'Ausencias del periodo' },
+  { q: 'checador',              icon: 'fa-fingerprint',          title: 'Checador hoy',    sub: 'Asistencia del día' },
+  { q: 'vacaciones',            icon: 'fa-umbrella-beach',       title: 'Vacaciones',      sub: 'Quién está de vacaciones' },
+  { q: 'vacaciones semana siguiente', icon: 'fa-calendar-week',  title: 'Vacaciones próximas', sub: 'Semana siguiente' },
+  { q: 'enfermedades',          icon: 'fa-notes-medical',        title: 'Enfermedades',    sub: 'Permisos médicos' },
+  { q: 'gym',                   icon: 'fa-dumbbell',             title: 'Gym',             sub: 'Beneficio de gimnasio' },
+  { q: 'precios erroneos',      icon: 'fa-tag',                  title: 'Precios erróneos',sub: 'Detectar errores' },
+  { q: 'vendedores',            icon: 'fa-user-tie',             title: 'Vendedores',      sub: 'Asignación incorrecta' },
+  { q: 'ventiapp',             icon: 'fa-store',                title: 'Ventiapp',        sub: 'Analítica marketplace' },
+  { q: 'killers',               icon: 'fa-crosshairs',           title: 'Killers',         sub: 'Productos urgentes' }
+];
+
+function escAttr(s){ return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function renderAtajos() {
+  const cont = document.getElementById('suggestions');
+  if (!cont) return;
+  // Barajar (Fisher-Yates) y tomar 10
+  const pool = POOL_ATAJOS.slice();
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  const n = window.innerWidth <= 768 ? 8 : 10;
+  const sel = pool.slice(0, n);
+  cont.innerHTML = sel.map(a =>
+    '<button class="suggestion" data-q="'+escAttr(a.q)+'">'+
+      '<span class="sg-icon"><i class="fas '+a.icon+'"></i></span>'+
+      '<span class="sg-text">'+
+        '<span class="sg-title">'+escAttr(a.title)+'</span>'+
+        '<span class="sg-sub">'+escAttr(a.sub)+'</span>'+
+      '</span>'+
+    '</button>'
+  ).join('');
+  // Enganchar clics
+  cont.querySelectorAll('.suggestion').forEach(b => {
+    b.addEventListener('click', () => sendMessage(b.dataset.q));
+  });
+}
+
+/* ============================================================
    INIT
    ============================================================ */
 window.addEventListener('load', () => {
@@ -2124,6 +2268,7 @@ window.addEventListener('load', () => {
   aplicarGirlyGuardado();
   actualizarReloj();
   setInterval(actualizarReloj, 1000);
+  renderAtajos();
   procesarQueryParam();
   // Precargar empleados en background para que el modal abra rápido
   obtenerEmpleados();
