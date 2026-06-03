@@ -1161,10 +1161,12 @@ body.girly-mode .date-field input:focus {
   .date-inputs { grid-template-columns: 1fr; }
   .quick-dates { gap: 7px; }
   .quick-dates button { font-size: calc(12px * var(--fs)); padding: 9px 12px; flex: 1 1 auto; }
-  /* iOS hace zoom al enfocar inputs <16px; forzamos 16px en móvil */
+  /* iOS hace zoom al enfocar inputs <16px; forzamos 16px FIJO (sin calc/var
+     porque iOS Safari a veces no evalúa el calc a tiempo y termina haciendo
+     zoom de todos modos). 16px es el mínimo absoluto. */
   .date-field input[type="date"],
   .filter-section input[type="text"],
-  #message-input { font-size: calc(16px * var(--fs)) !important; }
+  #message-input { font-size: 16px !important; }
 }
 @keyframes sheetUp {
   from { opacity: 0.4; transform: translateY(100%); }
@@ -1177,9 +1179,11 @@ body.girly-mode .date-field input:focus {
 .mobile-menu-btn {
   display: none;
   position: fixed;
-  top: 18px; left: 18px;
+  /* Respetar el notch/dynamic island/barra de status del iPhone */
+  top: calc(env(safe-area-inset-top, 0px) + 12px);
+  left: calc(env(safe-area-inset-left, 0px) + 14px);
   z-index: 300;
-  width: 40px; height: 40px;
+  width: 42px; height: 42px;
   border-radius: 11px;
   background: linear-gradient(135deg, var(--primary), var(--secondary));
   border: none !important;
@@ -1228,25 +1232,37 @@ body.girly-mode .mobile-menu-btn {
     overflow: hidden;
     position: fixed; width: 100%;
   }
+  /* Sidebar — selector ESPECÍFICO para ganarle al base que tiene
+     backdrop-filter: blur(20px). Sin selector específico, Safari iOS
+     a veces ignora el !important en backdrop-filter. */
+  body .sidebar,
   .sidebar {
     transform: translateX(-100%);
     width: 300px;
-    /* SÓLIDO en móvil: sin transparencia ni blur (eso lo hacía verse borroso).
-       El overlay aparte oscurece el fondo; el sidebar va NÍTIDO encima. */
     background: #0F172A !important;
     backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
     box-shadow: 8px 0 24px rgba(0, 0, 0, 0.5);
     z-index: 200;
+    /* 100dvh respeta correctamente la barra dinámica de iOS Safari (a
+       diferencia de 100vh que incluye la barra del navegador). */
+    height: 100dvh;
+    max-height: 100dvh;
+    /* Padding superior con safe-area para que el contenido del sidebar
+       no quede pegado al notch/barra de status del iPhone. */
+    padding-top: calc(env(safe-area-inset-top, 0px) + 20px);
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);
   }
   .sidebar.active { transform: translateX(0); }
   .sidebar-overlay.active { display: block; }
   .main-content { margin-left: 0 !important; padding-top: 0 !important; }
 
   /* Topbar compacto: deja sitio al botón hamburguesa sin desperdiciar altura.
-     El padding-left abre hueco para el botón (44px + aire). */
+     El padding-left abre hueco para el botón, y el margin-top respeta el
+     notch del iPhone. */
   .topbar {
-    margin: 10px 10px 8px;
-    padding: 10px 14px 10px 70px;
+    margin: calc(env(safe-area-inset-top, 0px) + 8px) 10px 8px;
+    padding: 10px 14px 10px 74px;
     border-radius: 12px;
   }
   .topbar-left { gap: 10px; }
@@ -2349,6 +2365,12 @@ function posicionarComposer(modo) {
   const slotWel  = document.getElementById('composer-slot-welcome');
   const composer = document.getElementById('composer-bottom');
   if (!inner || !slotWel || !composer) return;
+
+  // Preservar el foco del input si lo tenía antes de mover el nodo. Sin esto,
+  // mover el DOM del composer hace que el navegador pierda el foco, y en iOS
+  // a veces el input queda "muerto" (no responde al tap, no abre el teclado).
+  const inputTeniaFoco = (document.activeElement === messageInput);
+
   if (modo === 'welcome') {
     if (inner.parentElement !== slotWel) slotWel.appendChild(inner);
     composer.classList.add('hidden');
@@ -2357,6 +2379,14 @@ function posicionarComposer(modo) {
     if (inner.parentElement !== composer) composer.appendChild(inner);
     composer.classList.remove('hidden');
     document.body.classList.remove('composer-on-top');
+  }
+
+  // Restaurar foco después de mover si lo tenía
+  if (inputTeniaFoco && messageInput) {
+    // En iOS Safari el focus() inmediato después de un appendChild a veces no
+    // dispara el teclado. Lo retrasamos al siguiente frame para que el
+    // navegador termine de procesar el cambio del DOM.
+    requestAnimationFrame(function() { messageInput.focus(); });
   }
 }
 
