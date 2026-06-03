@@ -11,7 +11,7 @@
  * para que los navegadores actualicen automáticamente.
  */
 
-const CACHE_VERSION = 'v12';
+const CACHE_VERSION = 'v14';
 const CACHE_NAME = 'bot-em-' + CACHE_VERSION;
 
 // Font Awesome (CDN) — se precachea para que los íconos no se rompan

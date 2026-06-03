@@ -479,6 +479,49 @@ body.composer-on-top .chat-main { padding-bottom: 16px; }
   width: 100%;
   margin: 0 auto;
 }
+/* Header arriba de los atajos: etiqueta + botón "Nuevos" para regenerar al azar */
+.suggestions-header {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%; max-width: 1200px;
+  margin: 4px auto 12px;
+  padding: 0 4px;
+}
+.suggestions-label {
+  font-size: calc(12px * var(--fs));
+  font-weight: 700;
+  color: var(--text-secondary);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.refresh-atajos-btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 7px 13px;
+  background: linear-gradient(135deg, rgba(56,189,248,0.18), rgba(30,41,59,0.55));
+  border: 1px solid rgba(56, 189, 248, 0.40) !important;
+  border-radius: 10px;
+  color: var(--text-primary);
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif !important;
+  font-size: calc(11.5px * var(--fs)); font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.18s, box-shadow 0.18s, background 0.18s;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+}
+.refresh-atajos-btn:hover {
+  background: linear-gradient(135deg, rgba(56,189,248,0.28), rgba(30,41,59,0.7));
+  border-color: rgba(56,189,248,0.65) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(56,189,248,0.25), inset 0 1px 0 rgba(255,255,255,0.12);
+}
+.refresh-atajos-btn:active { transform: translateY(0) scale(0.97); }
+.refresh-atajos-btn i { font-size: calc(11px * var(--fs)); }
+/* Animación de giro al refrescar */
+.refresh-atajos-btn.spinning i {
+  animation: spinIcon 0.5s ease-out;
+}
+@keyframes spinIcon {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
 /* Tarjeta de atajo: glossy, cristal Aero, ícono con volumen */
 .suggestion {
   position: relative;
@@ -1130,7 +1173,17 @@ body.girly-mode .mobile-menu-btn {
 }
 
 @media (max-width: 768px) {
+  /* MÓVIL: tipografía ~15% más chica que en escritorio. Con --fs:1.35 todo
+     se veía gigantesco en pantallas chicas (rompía línea innecesariamente,
+     burbujas con padding excesivo). Ahora --fs:1.15 deja un tamaño cómodo
+     sin desperdiciar espacio horizontal. */
+  :root { --fs: 1.15; }
+
   .mobile-menu-btn { display: flex; }
+
+  /* Burbujas más anchas y con menos padding para que no rompan línea. */
+  .message { max-width: 96%; gap: 8px; }
+  .msg-bubble { padding: 10px 13px; }
 
   /* En móvil la página NO hace scroll: el alto se fija al viewport dinámico
      y solo .chat-main scrollea internamente. Así el composer queda SIEMPRE
@@ -1196,9 +1249,7 @@ body.girly-mode .mobile-menu-btn {
   .welcome-title { font-size: calc(17px * var(--fs)); margin-bottom: 2px; }
   .welcome-subtitle { font-size: calc(11px * var(--fs)); margin-bottom: 12px; }
   #composer-slot-welcome { margin-bottom: 14px; }
-  .message { max-width: 92%; gap: 8px; }
-  .msg-avatar { width: 28px; height: 28px; font-size: calc(12px * var(--fs)); }
-  .msg-bubble { padding: 9px 12px; font-size: calc(13px * var(--fs)); border-radius: 12px; }
+  /* .message, .msg-avatar y .msg-bubble se definen al inicio del media query */
 
   /* Ayuda accesible: en vez de ocultarla, la dejamos como ícono compacto */
   .topbar-actions { display: flex; }
@@ -1467,6 +1518,14 @@ body.girly-mode .typing span { background: #BA8FFF; }
             <div class="welcome-subtitle">Escribe una pregunta o toca un atajo</div>
             <!-- Slot donde aterriza el composer en pantalla de bienvenida -->
             <div id="composer-slot-welcome"></div>
+            <div class="suggestions-header">
+              <span class="suggestions-label">⚡ Atajos rápidos</span>
+              <button class="refresh-atajos-btn" id="refresh-atajos-btn"
+                      onclick="renderAtajos(true)" title="Generar nuevos atajos">
+                <i class="fas fa-arrows-rotate"></i>
+                <span>Nuevos</span>
+              </button>
+            </div>
             <div class="suggestions" id="suggestions"></div>
           </div>
         </div>
@@ -2250,6 +2309,7 @@ function posicionarComposer(modo) {
 function hideWelcome() {
   if (welcomeCard) welcomeCard.style.display = 'none';
   posicionarComposer('bottom');
+  detenerAutoRefresh();
 }
 
 function addUserMessage(text) {
@@ -2356,6 +2416,7 @@ function limpiarChat() {
   if (welcomeCard) welcomeCard.style.display = '';
   renderAtajos();
   posicionarComposer('welcome');
+  autoRefreshAtajos();
   if (window.innerWidth > 768) messageInput.focus();
 }
 
@@ -2394,7 +2455,7 @@ const POOL_ATAJOS = [
   { q: 'retardos hoy',                icon: 'fa-hourglass-half',       title: 'Retardos de hoy',       sub: 'Llegadas tarde del día' },
   { q: 'faltas hoy',                  icon: 'fa-calendar-xmark',       title: 'Faltas de hoy',         sub: 'Ausentes del día' },
   { q: 'puntuales hoy',               icon: 'fa-circle-check',         title: 'Puntuales hoy',         sub: 'Llegaron a tiempo' },
-  { q: 'vacaciones',                  icon: 'fa-umbrella-beach',       title: 'De vacaciones hoy',     sub: 'Quién no viene' },
+  { q: 'vacaciones hoy',              icon: 'fa-umbrella-beach',       title: 'De vacaciones hoy',     sub: 'Quién no viene' },
   { q: 'enfermedades hoy',            icon: 'fa-notes-medical',        title: 'Permisos de hoy',       sub: 'Médicos / personales' },
 
   // ── SEMANA / MES (rangos útiles) ──────────────────────────────
@@ -2404,13 +2465,19 @@ const POOL_ATAJOS = [
   { q: 'vacaciones mes siguiente',    icon: 'fa-calendar-days',        title: 'Vacaciones del mes',    sub: 'Mes que viene' },
   { q: 'retardos mes pasado',         icon: 'fa-clock-rotate-left',    title: 'Retardos mes pasado',   sub: 'Cierre del mes' },
 
-  // ── ALERTAS / OPERACIÓN ───────────────────────────────────────
-  { q: 'sobreventa',                  icon: 'fa-triangle-exclamation', title: 'Sobreventa',            sub: 'Stock en negativo' },
-  { q: 'por recibir',                 icon: 'fa-truck',                title: 'Por recibir',           sub: 'Mercancía en camino' },
-  { q: 'killers',                     icon: 'fa-crosshairs',           title: 'Productos killers',     sub: 'Urgentes de revisar' },
-  { q: 'precios erroneos',            icon: 'fa-tag',                  title: 'Precios erróneos',      sub: 'Errores a corregir' },
-  { q: 'vendedores incorrectos',      icon: 'fa-user-tie',             title: 'Vendedores incorrectos',sub: 'Asignación errada' },
-  { q: 'sin publicar urgente',        icon: 'fa-bullhorn',             title: 'Sin publicar urgente',  sub: 'Productos por publicar' },
+  // ── ALERTAS / OPERACIÓN — siempre con filtro, NUNCA abiertas ──
+  // Filtros por canal (ML ELECTRONICS / WALMART son los principales)
+  // o por fecha (hoy / esta semana) para evitar resultados gigantes.
+  { q: 'sobreventa ml electronics',   icon: 'fa-triangle-exclamation', title: 'Sobreventa ML',         sub: 'ML Electronics' },
+  { q: 'sobreventa walmart',          icon: 'fa-triangle-exclamation', title: 'Sobreventa Walmart',    sub: 'Walmart' },
+  { q: 'sobreventa hoy',              icon: 'fa-bell',                 title: 'Sobreventa de hoy',     sub: 'Del día' },
+  { q: 'por recibir hoy',             icon: 'fa-truck',                title: 'Por recibir hoy',       sub: 'Mercancía del día' },
+  { q: 'por recibir esta semana',     icon: 'fa-truck-fast',           title: 'Por recibir semanal',   sub: 'Esta semana' },
+  { q: 'killers ml electronics',      icon: 'fa-crosshairs',           title: 'Killers ML',            sub: 'Urgentes ML Electronics' },
+  { q: 'killers walmart',             icon: 'fa-crosshairs',           title: 'Killers Walmart',       sub: 'Urgentes Walmart' },
+  { q: 'precios erroneos hoy',        icon: 'fa-tag',                  title: 'Precios erróneos hoy',  sub: 'Errores del día' },
+  { q: 'vendedores incorrectos hoy',  icon: 'fa-user-tie',             title: 'Vendedores hoy',        sub: 'Asignación del día' },
+  { q: 'ventiapp urgente',            icon: 'fa-bullhorn',             title: 'Urgentes por publicar', sub: 'Falta poco / urgente' },
 
   // ── BONO / GYM (revisión rápida) ──────────────────────────────
   { q: 'bono puntualidad',            icon: 'fa-trophy',               title: 'Bono puntualidad',      sub: 'Quién lo gana este mes' },
@@ -2489,11 +2556,11 @@ const GUIAS = {
   },
   ventiapp_ayuda: {
     titulo: '🛒 Para qué sirve Ventiapp',
-    intro: 'Ventiapp analiza tus marketplaces: productos urgentes (killers), falta de stock, errores de canal. Útil para revisar el día antes de operar.',
+    intro: 'Ventiapp analiza tus marketplaces: productos urgentes, falta de stock, errores de canal. Usa filtros por canal (ML, Walmart) para evitar listas largas.',
     ejemplos: [
-      { cmd: 'ventiapp',  label: '• Resumen Ventiapp' },
-      { cmd: 'killers',   label: '• Productos urgentes' },
-      { cmd: 'sobreventa', label: '• Sobreventa actual' }
+      { cmd: 'ventiapp urgente',       label: '• Urgentes por publicar' },
+      { cmd: 'killers ml electronics', label: '• Killers en ML' },
+      { cmd: 'sobreventa walmart',     label: '• Sobreventa Walmart' }
     ],
     filtroId: 'ventiapp',
     filtroLabel: 'Abrir analítica Ventiapp'
@@ -2502,7 +2569,7 @@ const GUIAS = {
 
 function escAttr(s){ return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-function renderAtajos() {
+function renderAtajos(animar) {
   const cont = document.getElementById('suggestions');
   if (!cont) return;
   // Barajar (Fisher-Yates)
@@ -2513,6 +2580,26 @@ function renderAtajos() {
   }
   const n = window.innerWidth <= 768 ? 12 : 20;
   const sel = pool.slice(0, n);
+
+  // Si se pidió animar (botón manual o autorefresh), hacer fade-out → fade-in
+  if (animar) {
+    cont.style.transition = 'opacity 0.22s';
+    cont.style.opacity = '0';
+    const btn = document.getElementById('refresh-atajos-btn');
+    if (btn) {
+      btn.classList.add('spinning');
+      setTimeout(() => btn.classList.remove('spinning'), 600);
+    }
+    setTimeout(() => {
+      renderAtajosHTML(cont, sel);
+      cont.style.opacity = '1';
+    }, 220);
+  } else {
+    renderAtajosHTML(cont, sel);
+  }
+}
+
+function renderAtajosHTML(cont, sel) {
   cont.innerHTML = sel.map(a => {
     const tipo = a.type || 'query';
     const data = tipo === 'guide'
@@ -2534,6 +2621,35 @@ function renderAtajos() {
       else if (b.dataset.q)   sendMessage(b.dataset.q);
     });
   });
+}
+
+/* ============================================================
+   AUTOREFRESH — regenera atajos cada 10s mientras estás en la
+   pantalla de bienvenida. Se pausa al chatear, al estar en otra
+   pestaña, o si el usuario está tocando una tarjeta (hover/foco).
+   ============================================================ */
+let _autoRefreshTimer = null;
+
+function autoRefreshAtajos() {
+  detenerAutoRefresh();
+  _autoRefreshTimer = setInterval(() => {
+    // No refrescar si la pestaña está oculta
+    if (document.hidden) return;
+    // No refrescar si el welcome no está visible (ya chateamos)
+    const wc = document.getElementById('welcome-card');
+    if (!wc || wc.style.display === 'none') return;
+    // No refrescar si el usuario tiene el cursor sobre algún atajo
+    const cont = document.getElementById('suggestions');
+    if (cont && cont.matches(':hover')) return;
+    renderAtajos(true);
+  }, 10000);
+}
+
+function detenerAutoRefresh() {
+  if (_autoRefreshTimer) {
+    clearInterval(_autoRefreshTimer);
+    _autoRefreshTimer = null;
+  }
 }
 
 /* ============================================================
@@ -2590,6 +2706,7 @@ window.addEventListener('load', () => {
   setInterval(actualizarReloj, 1000);
   renderAtajos();
   posicionarComposer('welcome');
+  autoRefreshAtajos();
   procesarQueryParam();
   // Precargar empleados en background para que el modal abra rápido
   obtenerEmpleados();
