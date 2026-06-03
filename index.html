@@ -297,12 +297,47 @@ body.girly-mode .pulse-indicator::before { background: #BA8FFF; }
 }
 
 /* Navegación del sidebar */
-.nav-section { margin-bottom: 22px; }
+/* Bloques del sidebar — cada sección queda visualmente separada de la
+   anterior con una línea divisoria sutil (degradado que se desvanece a los
+   bordes). El título tiene una barrita de color azul a la izquierda que
+   ayuda a delimitarlo del bloque anterior. */
+.nav-section {
+  margin-bottom: 18px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid transparent;
+  /* Línea divisoria estilo "fade out" en los bordes */
+  border-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(56, 189, 248, 0.18) 20%,
+    rgba(56, 189, 248, 0.18) 80%,
+    transparent 100%
+  ) 1;
+}
+/* La última sección no necesita línea inferior (no hay nada después) */
+.nav-section:last-child {
+  border-bottom: none;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+}
 .nav-title {
-  font-size: calc(10px * var(--fs)); font-weight: 700; text-transform: uppercase;
-  letter-spacing: 1.2px; color: var(--text-secondary);
-  margin-bottom: 10px; padding: 0 12px;
-  opacity: 0.7;
+  font-size: calc(10px * var(--fs));
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--text-primary);
+  margin-bottom: 10px;
+  padding: 4px 12px 4px 14px;
+  opacity: 0.92;
+  /* Barrita de color azul a la izquierda del título */
+  border-left: 3px solid var(--primary);
+  background: linear-gradient(
+    90deg,
+    rgba(56, 189, 248, 0.10) 0%,
+    rgba(56, 189, 248, 0.02) 60%,
+    transparent 100%
+  );
+  border-radius: 0 6px 6px 0;
 }
 .nav-item {
   display: flex; align-items: center; gap: 11px;
@@ -1292,6 +1327,25 @@ body.girly-mode .topbar-btn {
   background: rgba(186, 143, 255, 0.1);
   border-color: #BA8FFF !important;
   color: #BA8FFF;
+}
+/* Separadores y títulos del sidebar en modo Girly — púrpura coherente */
+body.girly-mode .nav-section {
+  border-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(186, 143, 255, 0.25) 20%,
+    rgba(186, 143, 255, 0.25) 80%,
+    transparent 100%
+  ) 1;
+}
+body.girly-mode .nav-title {
+  border-left-color: #BA8FFF !important;
+  background: linear-gradient(
+    90deg,
+    rgba(186, 143, 255, 0.12) 0%,
+    rgba(186, 143, 255, 0.02) 60%,
+    transparent 100%
+  ) !important;
 }
 body.girly-mode .topbar-btn:hover {
   background: #BA8FFF; color: white;
