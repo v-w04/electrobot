@@ -51,20 +51,149 @@
    SISTEMA DE DISEÑO — clavado a Styles.css de la intranet
    ============================================================ */
 :root {
-  --primary: #3B82F6;
-  --primary-dark: #2563EB;
-  --secondary: #06B6D4;
-  --success: #10B981;
-  --warning: #F59E0B;
-  --danger: #EF4444;
-  --bg-primary: #0F172A;
-  --bg-secondary: #1E293B;
-  --bg-tertiary: #334155;
-  --text-primary: #F1F5F9;
-  --text-secondary: #94A3B8;
-  --border-color: #334155;
-  --fs: 1.35;   /* escala global de tipografía (1 = 100%, 1.35 = +35%) */
+  /* ── Paleta BMW Corporate Dark ─────────────────────────────
+     Adoptamos el sistema BMW pero adaptado al modo oscuro.
+     BMW corporate blue (#1c69d4) es el ÚNICO color de acción.
+     surface-dark (#1a2129) y surface-dark-elevated (#262e38) son la
+     base oscura. Sin gradientes coloridos: depth viene de contraste
+     entre superficies, no de blur ni sombras coloridas. */
+  --primary:         #1c69d4;       /* BMW Blue — único color de acción */
+  --primary-dark:    #0653b6;       /* BMW Blue pressed/hover */
+  --primary-soft:    rgba(28, 105, 212, 0.12);
+  --secondary:       #1c69d4;       /* mismo blue, BMW no usa secundario */
+
+  --success:         #22c55e;       /* BMW semantic */
+  --warning:         #f59e0b;
+  --danger:          #dc2626;
+
+  /* Superficies oscuras BMW */
+  --bg-primary:      #1a2129;       /* BMW surface-dark — navy cálido */
+  --bg-secondary:    #262e38;       /* BMW surface-dark-elevated */
+  --bg-tertiary:     #2f3742;       /* card sobre elevated */
+  --bg-card:         #262e38;
+
+  /* Texto */
+  --text-primary:    #ffffff;       /* BMW on-dark */
+  --text-secondary:  #bbbbbb;       /* BMW on-dark-soft */
+  --text-muted:      #9a9a9a;       /* BMW muted-soft */
+
+  /* Hairlines (1px dividers) — BMW principle */
+  --border-color:    rgba(255, 255, 255, 0.08);
+  --border-strong:   rgba(255, 255, 255, 0.18);
+
+  /* M tricolor — solo para acentos específicos, NO como CTA */
+  --m-blue-light:    #0066b1;
+  --m-blue-dark:     #1c69d4;
+  --m-red:           #e22718;
+
+  /* BMW token radius — 0px es la firma corporativa */
+  --radius-card:     0px;
+  --radius-button:   0px;
+  --radius-input:    0px;
+  --radius-pill:     0px;
+
+  --fs: 1.35;
 }
+
+/* ════════════════════════════════════════════════════════════════
+   OVERRIDES BMW CORPORATE DARK
+   Aplicados al final para ganar especificidad sin reescribir
+   cada bloque individual. Adoptamos:
+   - Esquinas 0px en cards, botones, inputs (firma corporativa)
+   - Sin sombras de color (depth = contraste de superficies)
+   - Texto display 700 + body 300 ligero (signature editorial)
+   - Botones rectangulares planos (no gradientes ni glow)
+   - "LEARN MORE"-style links uppercase con tracking
+   ════════════════════════════════════════════════════════════════ */
+
+/* Cards, contenedores y elementos rectangulares grandes */
+.chat-frame,
+.topbar,
+.welcome-card,
+.suggestion-card,
+.composer-input-wrap,
+.modal,
+.modal-content,
+.sheet-modal,
+.error-banner {
+  border-radius: 0 !important;
+}
+
+/* Botones planos sin gradiente — BMW blue plano */
+.send-btn,
+.topbar-btn,
+.mobile-menu-btn,
+.atajo-refresh-btn,
+.shortcut-btn,
+.quick-dates button,
+.modal-btn,
+.close-btn {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Botones primarios: BMW Blue plano, sin gradiente, hover oscurece */
+.send-btn,
+.mobile-menu-btn {
+  background: var(--primary) !important;
+  border: none !important;
+}
+.send-btn:hover,
+.mobile-menu-btn:hover { background: var(--primary-dark) !important; }
+
+/* Inputs rectangulares */
+input[type="text"],
+input[type="date"],
+input[type="number"],
+textarea,
+.filter-section input,
+.date-field input,
+#message-input,
+.composer-input-wrap { border-radius: 0 !important; }
+
+/* Burbujas de mensaje: BMW las usa rectangulares con tinte sutil */
+.msg-bubble {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Tipografía display BMW — pesada para títulos */
+.welcome-title,
+.logo-text h1,
+.modal-title,
+.sheet-title,
+.nav-title,
+.topbar h2 {
+  font-weight: 700 !important;
+  letter-spacing: 0 !important;
+}
+
+/* Tipografía body BMW — ligera 300 para texto secundario */
+.welcome-subtitle,
+.logo-text p,
+.suggestion-sub,
+.msg-bubble {
+  font-weight: 300 !important;
+}
+
+/* Links UPPERCASE estilo "LEARN MORE" — usados en el header de Atajos */
+.atajos-header > span,
+.atajos-section-label {
+  text-transform: uppercase !important;
+  letter-spacing: 1.5px !important;
+  font-weight: 700 !important;
+}
+
+/* Sin sombras coloridas en cards (BMW: depth = contraste) */
+.suggestion-card,
+.welcome-card,
+.chat-frame {
+  box-shadow: none !important;
+}
+
+/* Scrollbars siguen siendo finos pero sin gradiente */
+*::-webkit-scrollbar-thumb { background: var(--border-strong) !important; }
+*::-webkit-scrollbar-thumb:hover { background: var(--primary) !important; }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 *, *::before, *::after { box-sizing: border-box; }
@@ -79,10 +208,12 @@
 }
 .fa, .fas, [class*="fa-"] { font-weight: 900 !important; }
 
-html { background: #0F172A; min-height: 100vh; }
+html { background: var(--bg-primary); min-height: 100vh; }
 body {
   font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif !important;
-  background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%) !important;
+  /* BMW corporate dark: superficie plana, depth viene de contraste entre
+     surface-dark y surface-dark-elevated, no de gradientes diagonales. */
+  background: var(--bg-primary) !important;
   background-attachment: fixed !important;
   color: var(--text-primary);
   min-height: 100vh;
@@ -90,7 +221,7 @@ body {
 }
 
 /* ============================================================
-   PARTÍCULAS FLOTANTES
+   PARTÍCULAS FLOTANTES — Adoptan el azul BMW
    ============================================================ */
 #particles {
   position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -98,9 +229,12 @@ body {
 }
 .particle {
   position: absolute; width: 3px; height: 3px;
-  background: rgba(59, 130, 246, 0.8);
+  /* Antes: rgba(59, 130, 246, ...) (azul slate). Ahora: BMW Blue (#1c69d4)
+     pero con menos opacidad/glow para que el ambiente quede más corporativo
+     y menos "tech sci-fi". */
+  background: rgba(28, 105, 212, 0.55);
   border-radius: 50%;
-  box-shadow: 0 0 6px rgba(59, 130, 246, 0.8);
+  box-shadow: 0 0 5px rgba(28, 105, 212, 0.4);
   will-change: transform, opacity; transform: translateZ(0);
 }
 @keyframes floatOrganic1 {
@@ -149,19 +283,20 @@ body {
 
 .sidebar {
   width: 340px;
-  background: rgba(15, 23, 42, 0.98);
-  border-right: 1px solid rgba(59, 130, 246, 0.3);
+  /* BMW corporate: superficie plana sólida, sin transparencia/blur */
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color);
   padding: 24px;
   overflow-y: auto; overflow-x: hidden;
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   height: 100vh; max-height: 100vh;
   position: fixed; top: 0; left: 0; z-index: 200;
-  backdrop-filter: blur(20px);
-  box-shadow: 4px 0 20px rgba(0, 0, 0, 0.3);
+  /* BMW: sin sombras coloridas */
+  box-shadow: none;
 }
 .sidebar::-webkit-scrollbar { width: 6px; }
-.sidebar::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.5); }
-.sidebar::-webkit-scrollbar-thumb { background: rgba(59, 130, 246, 0.5); border-radius: 3px; }
+.sidebar::-webkit-scrollbar-track { background: transparent; }
+.sidebar::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 0; }
 
 /* Logo */
 .logo-container {
@@ -381,12 +516,30 @@ body.girly-mode .pulse-indicator::before { background: #BA8FFF; }
   display: flex; justify-content: space-between; align-items: center;
   margin: 20px 24px 16px;
   padding: 14px 20px;
-  background: rgba(30, 41, 59, 0.6);
-  backdrop-filter: blur(20px);
+  /* BMW: superficie plana sólida, sin blur ni transparencia */
+  background: var(--bg-secondary);
   border: 1px solid var(--border-color) !important;
-  border-radius: 14px;
+  border-radius: 0;
   flex-shrink: 0;
+  position: relative;
   animation: slideInUp 0.6s ease-out both;
+}
+/* Acento M tricolor en el borde superior del topbar — guiño BMW corporate.
+   4px de altura, gradiente azul→azul oscuro→rojo M. Solo aquí en el topbar
+   (no se repite en el resto de la UI). */
+.topbar::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: linear-gradient(
+    90deg,
+    var(--m-blue-light) 0%,
+    var(--m-blue-light) 33%,
+    var(--m-blue-dark)  33%,
+    var(--m-blue-dark)  66%,
+    var(--m-red)        66%,
+    var(--m-red)        100%
+  );
+  pointer-events: none;
 }
 @keyframes slideInUp {
   from { opacity: 0; transform: translateY(30px); }
@@ -394,11 +547,12 @@ body.girly-mode .pulse-indicator::before { background: #BA8FFF; }
 }
 .topbar-left { display: flex; align-items: center; gap: 12px; }
 .bot-avatar {
-  width: 40px; height: 40px; border-radius: 10px;
-  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  width: 40px; height: 40px; border-radius: 0;
+  background: var(--primary);
   display: flex; align-items: center; justify-content: center;
   font-size: calc(18px * var(--fs)); color: white;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  /* BMW: sin sombra de color */
+  box-shadow: none;
   flex-shrink: 0;
 }
 .topbar-left h2 { font-size: calc(18px * var(--fs)); font-weight: 700; margin-bottom: 2px; }
@@ -416,9 +570,10 @@ body.girly-mode .pulse-indicator::before { background: #BA8FFF; }
   flex: 1;
   min-height: 0;
   margin: 0 24px 20px;
-  background: rgba(15, 23, 42, 0.5);
+  /* BMW: superficie plana, depth viene de border 1px hairline */
+  background: var(--bg-secondary);
   border: 1px solid var(--border-color) !important;
-  border-radius: 14px;
+  border-radius: 0;
   overflow: hidden;
   display: flex; flex-direction: column;
   animation: slideInUp 0.6s ease-out 0.1s both;
@@ -479,19 +634,21 @@ body.composer-on-top .chat-main { padding-bottom: 16px; }
   display: flex; align-items: center; justify-content: center;
   font-size: calc(40px * var(--fs));
   background:
-    radial-gradient(circle at 35% 28%, rgba(255,255,255,0.35), transparent 55%),
-    linear-gradient(135deg, #1E293B, #0F172A);
-  border: 2px solid rgba(56, 189, 248, 0.55);
+    radial-gradient(circle at 35% 28%, rgba(255,255,255,0.18), transparent 55%),
+    var(--bg-secondary);
+  border: 2px solid var(--primary);
+  /* BMW principle: depth via contraste, no glows multicolor. Mantenemos un
+     pulso sutil porque el welcome necesita energía. */
   box-shadow:
-    0 0 0 4px rgba(56, 189, 248, 0.12),
-    0 0 28px rgba(56, 189, 248, 0.45),
-    inset 0 2px 8px rgba(255,255,255,0.12);
+    0 0 0 3px rgba(28, 105, 212, 0.18),
+    0 0 22px rgba(28, 105, 212, 0.30),
+    inset 0 2px 6px rgba(255,255,255,0.08);
   animation: avatarGlow 3.5s ease-in-out infinite;
   position: relative;
 }
 @keyframes avatarGlow {
-  0%, 100% { box-shadow: 0 0 0 4px rgba(56,189,248,0.12), 0 0 22px rgba(56,189,248,0.40), inset 0 2px 8px rgba(255,255,255,0.12); }
-  50%      { box-shadow: 0 0 0 5px rgba(56,189,248,0.18), 0 0 36px rgba(56,189,248,0.60), inset 0 2px 10px rgba(255,255,255,0.18); }
+  0%, 100% { box-shadow: 0 0 0 3px rgba(28,105,212,0.18), 0 0 18px rgba(28,105,212,0.28), inset 0 2px 6px rgba(255,255,255,0.08); }
+  50%      { box-shadow: 0 0 0 4px rgba(28,105,212,0.28), 0 0 32px rgba(28,105,212,0.45), inset 0 2px 8px rgba(255,255,255,0.12); }
 }
 .welcome-emoji {  /* compat: por si queda algún emoji suelto */
   font-size: calc(40px * var(--fs));
@@ -557,47 +714,63 @@ body.composer-on-top .chat-main { padding-bottom: 16px; }
   from { transform: rotate(0deg); }
   to   { transform: rotate(360deg); }
 }
-/* Tarjeta de atajo: glossy, cristal Aero, ícono con volumen */
+/* Tarjeta de atajo — Patrón BMW model-card adaptado a oscuro:
+   plate plano sobre surface-dark-elevated, sin gradientes ni glossy,
+   sin sombras coloridas. Depth viene de contraste con el bg-primary.
+   Hover: cambia a primary-soft para feedback, sin transform exagerado. */
 .suggestion {
   position: relative;
   min-height: 68px;
-  background:
-    linear-gradient(180deg, rgba(56,189,248,0.10), rgba(30,41,59,0.55));
-  border: 1px solid rgba(56, 189, 248, 0.28) !important;
-  border-radius: 16px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color) !important;
+  border-radius: 0;
   padding: 16px 18px;
   text-align: left;
   color: var(--text-primary);
   cursor: pointer;
   overflow: hidden;
-  transition: transform 0.2s cubic-bezier(0.34,1.4,0.64,1), box-shadow 0.2s, border-color 0.2s, background 0.2s;
+  transition: background 0.18s, border-color 0.18s;
   font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif !important;
   display: flex; align-items: center; gap: 15px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.08);
   animation: slideInUp 0.4s ease-out backwards;
   -webkit-tap-highlight-color: transparent;
 }
-/* Reflejo glossy superior tipo botón MSN */
-.suggestion::before {
-  content: '';
-  position: absolute; top: 0; left: 0; right: 0; height: 45%;
-  background: linear-gradient(180deg, rgba(255,255,255,0.16), rgba(255,255,255,0));
-  pointer-events: none;
+.suggestion:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--border-strong) !important;
 }
-/* Badge de ícono con volumen */
+.suggestion:active {
+  background: var(--primary-soft);
+  border-color: var(--primary) !important;
+}
+/* Sin reflejo glossy — BMW corporate no usa highlights tipo Aero */
+.suggestion::before { display: none; }
+
+/* Badge de ícono — BMW Blue plano, esquinas rectas, sin gradiente ni glow */
 .suggestion .sg-icon {
   flex-shrink: 0;
   width: 46px; height: 46px;
-  border-radius: 13px;
+  border-radius: 0;
   display: flex; align-items: center; justify-content: center;
   font-size: calc(18px * var(--fs)); color: #fff;
-  background: linear-gradient(135deg, var(--primary), #38BDF8);
-  box-shadow: 0 3px 8px rgba(56,189,248,0.45), inset 0 1px 2px rgba(255,255,255,0.4);
+  background: var(--primary);
+  box-shadow: none;
 }
 .suggestion .sg-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.suggestion .sg-title { font-size: calc(13.5px * var(--fs)); font-weight: 700; line-height: 1.25; }
-.suggestion .sg-sub { font-size: calc(11px * var(--fs)); color: var(--text-secondary); line-height: 1.3;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Título BMW: pesado 700, sin tracking */
+.suggestion .sg-title {
+  font-size: calc(13.5px * var(--fs));
+  font-weight: 700;
+  line-height: 1.25;
+}
+/* Sub BMW: ligero 300 (la firma editorial corporate) */
+.suggestion .sg-sub {
+  font-size: calc(11px * var(--fs));
+  font-weight: 300;
+  color: var(--text-secondary);
+  line-height: 1.35;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .suggestion:nth-child(1) { animation-delay: 0.28s; }
 .suggestion:nth-child(2) { animation-delay: 0.33s; }
 .suggestion:nth-child(3) { animation-delay: 0.38s; }
@@ -751,11 +924,14 @@ body.composer-on-top .chat-main { padding-bottom: 16px; }
 }
 
 .msg-bubble {
-  background: rgba(30, 41, 59, 0.7);
+  background: var(--bg-tertiary);
   border: 1px solid var(--border-color) !important;
   padding: 11px 15px;
-  border-radius: 14px;
+  /* BMW: 0px corners */
+  border-radius: 0;
   font-size: calc(13.5px * var(--fs));
+  /* Body BMW: light 300 */
+  font-weight: 300;
   line-height: 1.55;
   word-wrap: break-word;
   overflow-wrap: break-word;
@@ -763,14 +939,12 @@ body.composer-on-top .chat-main { padding-bottom: 16px; }
   max-width: 100%;
   color: var(--text-primary);
 }
-.message.bot .msg-bubble {
-  border-top-left-radius: 4px;
-}
+/* BMW corporate no usa "ear" en burbujas — todas son rectangulares planas.
+   El emisor se distingue por color de fondo, no por forma. */
 .message.user .msg-bubble {
-  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  background: var(--primary);
   border-color: var(--primary) !important;
   color: white;
-  border-top-right-radius: 4px;
 }
 
 .msg-bubble b, .msg-bubble strong { font-weight: 700; color: var(--text-primary); }
