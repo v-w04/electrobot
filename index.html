@@ -454,7 +454,7 @@ body.girly-mode .pulse-indicator::before { background: #BA8FFF; }
    ============================================================ */
 .main-content {
   flex: 1;
-  margin-left: 340px;
+  margin-left: 0;
   height: 100vh;
   height: 100dvh;
   min-height: 0;
@@ -1321,13 +1321,133 @@ body.girly-mode .mobile-menu-btn {
 .sidebar-overlay {
   display: none;
   position: fixed; inset: 0;
+  /* Negro semi-transparente sólido. SIN blur: cuando lo tenía, el sidebar
+     se veía borroso aun siendo opaco porque el blur de esta capa afectaba
+     toda la composición en algunos navegadores. */
   background: rgba(0, 0, 0, 0.65);
-  backdrop-filter: blur(4px);
   z-index: 150;
   animation: modalFadeIn 0.2s ease;
 }
 @media (min-width: 769px) {
   .sidebar-overlay, .sidebar-overlay.active { display: none !important; }
+}
+
+/* ============================================================
+   TABLEROS DE CATEGORÍAS — reemplazan el sidebar.
+   Aparecen en el welcome-card, debajo del composer y arriba de
+   los atajos rápidos. Cada tablero abre el modal de subcomandos.
+   ============================================================ */
+.tableros-header {
+  display: flex; align-items: center; justify-content: flex-start;
+  margin: 22px 0 12px;
+  width: 100%;
+}
+.tableros-label {
+  font-size: calc(11px * var(--fs));
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text-secondary);
+}
+.tableros-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+  width: 100%;
+  margin-bottom: 8px;
+}
+.tablero {
+  position: relative;
+  background: linear-gradient(180deg, rgba(28, 105, 212, 0.10), rgba(21, 35, 58, 0.65));
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 16px 14px;
+  text-align: left;
+  cursor: pointer;
+  color: var(--text-primary);
+  transition: background 0.18s, border-color 0.18s, transform 0.18s;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif !important;
+  -webkit-tap-highlight-color: transparent;
+  display: flex; flex-direction: column; gap: 4px;
+  min-height: 90px;
+}
+.tablero:hover {
+  background: linear-gradient(180deg, rgba(28, 105, 212, 0.18), rgba(27, 43, 71, 0.85));
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+}
+.tablero:active {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  transform: translateY(0);
+}
+.tablero-icon {
+  font-size: calc(26px * var(--fs));
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.tablero-titulo {
+  font-size: calc(15px * var(--fs));
+  font-weight: 700;
+  line-height: 1.2;
+}
+.tablero-sub {
+  font-size: calc(11px * var(--fs));
+  font-weight: 300;
+  color: var(--text-secondary);
+  line-height: 1.35;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* Modal de subcomandos — reutiliza .modal-overlay y .modal-panel ya
+   definidos arriba para mantener animación y backdrop consistentes.
+   Solo añadimos la grilla de subcomandos. */
+.subcomandos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+.subcomando {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 16px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  cursor: pointer;
+  color: var(--text-primary);
+  transition: background 0.15s, border-color 0.15s, transform 0.15s;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif !important;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+}
+.subcomando:hover {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  transform: translateY(-1px);
+}
+.subcomando i {
+  width: 22px; text-align: center;
+  color: var(--primary);
+  font-size: calc(15px * var(--fs));
+}
+.subcomando span {
+  font-size: calc(13.5px * var(--fs));
+  font-weight: 700;
+}
+
+@media (max-width: 768px) {
+  .tableros-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .tablero {
+    min-height: 80px;
+    padding: 14px 12px;
+  }
+  .subcomandos-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
 }
 
 @media (max-width: 768px) {
@@ -1358,7 +1478,8 @@ body.girly-mode .mobile-menu-btn {
   .sidebar {
     transform: translateX(-100%);
     width: 300px;
-    background: #0F172A !important;
+    /* Sólido y sin blur — coincide con la paleta azul navy del resto */
+    background: #15233A !important;
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
     box-shadow: 8px 0 24px rgba(0, 0, 0, 0.5);
@@ -1519,156 +1640,14 @@ body.girly-mode .typing span { background: #BA8FFF; }
 <!-- Partículas de fondo -->
 <div id="particles"></div>
 
-<!-- Botón menú hamburguesa (solo móvil) -->
-<button id="mobile-menu-btn" class="mobile-menu-btn" onclick="toggleSidebar()">
-  <i class="fas fa-bars"></i>
-</button>
-
-<!-- Overlay para cerrar el sidebar tocando fuera (solo móvil) -->
-<div id="sidebar-overlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
-
 <div class="app-container">
 
   <!-- ============================================================
-       SIDEBAR
+       SIDEBAR ELIMINADO — ahora las categorías se muestran como
+       tarjetas/tableros en el welcome-card. Cada tarjeta abre un
+       modal con sus sub-comandos (ver #categoria-modal abajo).
        ============================================================ -->
-  <aside class="sidebar" id="sidebar">
 
-    <!-- Logo -->
-    <div class="logo-container">
-      <a href="./" title="Bot Electronics México">
-        <img src="https://i.imgur.com/cVfOQOW.jpeg" alt="Logo" class="logo-img">
-      </a>
-      <div class="logo-text">
-        <h1>Electronics México</h1>
-        <p>Bot · Asistente</p>
-      </div>
-    </div>
-
-    <!-- Controles rápidos -->
-    <div class="sidebar-controls">
-      <button class="topbar-btn small" onclick="limpiarChat()" title="Limpiar conversación">
-        <i class="fas fa-broom"></i>
-      </button>
-      <button class="topbar-btn small" id="toggle-theme" onclick="toggleGirlyMode()" title="Modo Girly">
-        <i class="fas fa-times"></i>
-      </button>
-    </div>
-
-    <!-- Botón Instalar (aparece solo si el navegador lo soporta) -->
-    <button id="btn-instalar" class="install-btn" onclick="instalarApp()" style="display:none;">
-      <i class="fas fa-download"></i>
-      <span>Instalar App</span>
-    </button>
-
-    <!-- Indicador en vivo -->
-    <div class="live-indicator">
-      <div class="pulse-indicator"></div>
-      <div style="flex: 1;">
-        <div class="live-indicator-label">Sistema en vivo</div>
-        <div class="live-indicator-value" id="live-time">--:--:--</div>
-      </div>
-    </div>
-
-    <!-- Navegación / accesos rápidos -->
-    <nav>
-      <div class="nav-section">
-        <div class="nav-title">🤖 Bot</div>
-        <div class="nav-item active" onclick="enfocarInput()">
-          <i class="fas fa-comments"></i>
-          <span>Chat</span>
-        </div>
-        <div class="nav-item" onclick="sendMessage('ayuda')">
-          <i class="fas fa-circle-info"></i>
-          <span>Ayuda</span>
-        </div>
-        <div class="nav-item" onclick="limpiarChat()">
-          <i class="fas fa-broom"></i>
-          <span>Limpiar</span>
-        </div>
-      </div>
-
-      <div class="nav-section">
-        <div class="nav-title">📦 Inventario</div>
-        <div class="nav-item" onclick="abrirFiltros('stock')">
-          <i class="fas fa-boxes-stacked"></i>
-          <span>Stock</span>
-        </div>
-        <div class="nav-item" onclick="abrirFiltros('ventas')">
-          <i class="fas fa-chart-line"></i>
-          <span>Ventas</span>
-        </div>
-        <div class="nav-item" onclick="abrirFiltros('sobreventa')">
-          <i class="fas fa-triangle-exclamation"></i>
-          <span>Sobreventa</span>
-        </div>
-        <div class="nav-item" onclick="abrirFiltros('porRecibir')">
-          <i class="fas fa-truck"></i>
-          <span>Por recibir</span>
-        </div>
-        <div class="nav-item" onclick="abrirFiltros('traslados')">
-          <i class="fas fa-arrow-right-arrow-left"></i>
-          <span>Traslados</span>
-        </div>
-      </div>
-
-      <div class="nav-section">
-        <div class="nav-title">⏰ Checador</div>
-        <div class="nav-item" onclick="abrirFiltros('asistencia')">
-          <i class="fas fa-fingerprint"></i>
-          <span>Asistencia</span>
-        </div>
-        <div class="nav-item" onclick="abrirFiltros('bono')">
-          <i class="fas fa-trophy"></i>
-          <span>Bono</span>
-        </div>
-        <div class="nav-item" onclick="abrirFiltros('retardos')">
-          <i class="fas fa-clock"></i>
-          <span>Retardos</span>
-        </div>
-        <div class="nav-item" onclick="abrirFiltros('faltas')">
-          <i class="fas fa-user-times"></i>
-          <span>Faltas</span>
-        </div>
-        <div class="nav-item" onclick="abrirFiltros('vacaciones')">
-          <i class="fas fa-umbrella-beach"></i>
-          <span>Vacaciones</span>
-        </div>
-        <div class="nav-item" onclick="abrirFiltros('enfermedades')">
-          <i class="fas fa-notes-medical"></i>
-          <span>Enfermedades</span>
-        </div>
-        <div class="nav-item" onclick="abrirFiltros('gym')">
-          <i class="fas fa-dumbbell"></i>
-          <span>Gym</span>
-        </div>
-      </div>
-
-      <div class="nav-section">
-        <div class="nav-title">💰 Precios</div>
-        <div class="nav-item" onclick="abrirFiltros('preciosErroneos')">
-          <i class="fas fa-circle-exclamation"></i>
-          <span>Erróneos</span>
-        </div>
-        <div class="nav-item" onclick="abrirFiltros('vendedoresIncorrectos')">
-          <i class="fas fa-user-tag"></i>
-          <span>Vendedores</span>
-        </div>
-      </div>
-
-      <div class="nav-section">
-        <div class="nav-title">📊 Marketplaces</div>
-        <div class="nav-item" onclick="abrirFiltros('ventiapp')">
-          <i class="fas fa-store"></i>
-          <span>Ventiapp</span>
-        </div>
-        <div class="nav-item" onclick="abrirFiltros('killers')">
-          <i class="fas fa-bullseye"></i>
-          <span>Killers</span>
-        </div>
-      </div>
-    </nav>
-  </aside>
 
   <!-- ============================================================
        MAIN CONTENT — chat
@@ -1707,6 +1686,43 @@ body.girly-mode .typing span { background: #BA8FFF; }
             <div class="welcome-subtitle">Escribe una pregunta o toca un atajo</div>
             <!-- Slot donde aterriza el composer en pantalla de bienvenida -->
             <div id="composer-slot-welcome"></div>
+
+            <!-- ============================================================
+                 TABLEROS DE CATEGORÍAS (antes sidebar)
+                 Al tocar cada uno se abre #categoria-modal con sus
+                 sub-comandos. Sustituye al aside.sidebar que existía antes.
+                 ============================================================ -->
+            <div class="tableros-header">
+              <span class="tableros-label">📋 Categorías</span>
+            </div>
+            <div class="tableros-grid">
+              <button class="tablero" onclick="abrirCategoria('bot')">
+                <div class="tablero-icon">🤖</div>
+                <div class="tablero-titulo">Bot</div>
+                <div class="tablero-sub">Chat · Ayuda · Limpiar</div>
+              </button>
+              <button class="tablero" onclick="abrirCategoria('inventario')">
+                <div class="tablero-icon">📦</div>
+                <div class="tablero-titulo">Inventario</div>
+                <div class="tablero-sub">Stock · Ventas · Traslados</div>
+              </button>
+              <button class="tablero" onclick="abrirCategoria('checador')">
+                <div class="tablero-icon">⏰</div>
+                <div class="tablero-titulo">Checador</div>
+                <div class="tablero-sub">Asistencia · Bono · Faltas</div>
+              </button>
+              <button class="tablero" onclick="abrirCategoria('precios')">
+                <div class="tablero-icon">💰</div>
+                <div class="tablero-titulo">Precios</div>
+                <div class="tablero-sub">Erróneos · Vendedores</div>
+              </button>
+              <button class="tablero" onclick="abrirCategoria('marketplaces')">
+                <div class="tablero-icon">📊</div>
+                <div class="tablero-titulo">Marketplaces</div>
+                <div class="tablero-sub">Ventiapp · Killers</div>
+              </button>
+            </div>
+
             <div class="suggestions-header">
               <span class="suggestions-label">⚡ Atajos rápidos</span>
               <button class="refresh-atajos-btn" id="refresh-atajos-btn"
@@ -1743,6 +1759,31 @@ body.girly-mode .typing span { background: #BA8FFF; }
 <!-- ============================================================
      MODAL DE FILTROS — se usa para los botones del sidebar
      ============================================================ -->
+<!-- ============================================================
+     MODAL DE CATEGORÍAS — abierto al tocar un tablero del welcome.
+     Contiene los sub-comandos de la categoría tocada (Stock, Ventas,
+     Asistencia, etc.). Reutiliza la estructura visual del modal de
+     filtros para mantener consistencia.
+     ============================================================ -->
+<div class="modal-overlay" id="modal-categoria" onclick="cerrarCategoriaBackdrop(event)">
+  <div class="modal-panel modal-panel-categoria" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h3 id="modal-categoria-titulo">
+        <span id="modal-categoria-icon">📋</span>
+        <span id="modal-categoria-nombre">Categoría</span>
+      </h3>
+      <button class="modal-close" onclick="cerrarCategoria()" aria-label="Cerrar">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="subcomandos-grid" id="subcomandos-grid">
+        <!-- Se llena dinámicamente en JS -->
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-filtros" onclick="cerrarFiltrosBackdrop(event)">
   <div class="modal-panel" onclick="event.stopPropagation()">
     <div class="modal-header">
@@ -2423,19 +2464,92 @@ function aplicarGirlyGuardado() {
 /* ============================================================
    MOBILE MENU
    ============================================================ */
-function toggleSidebar() {
-  const sb = document.getElementById('sidebar');
-  const ov = document.getElementById('sidebar-overlay');
-  const abierto = sb.classList.toggle('active');
-  if (ov) ov.classList.toggle('active', abierto);
-}
-function cerrarSidebarSiMobile() {
-  if (window.innerWidth <= 768) {
-    document.getElementById('sidebar').classList.remove('active');
-    const ov = document.getElementById('sidebar-overlay');
-    if (ov) ov.classList.remove('active');
+/* ============================================================
+   CATEGORÍAS — antes era sidebar, ahora tableros en welcome.
+   Cada tablero abre un modal con sus sub-comandos. abrirFiltros()
+   existente se reutiliza tal cual: el subcomando ejecuta el mismo
+   flujo que tenían los nav-item del sidebar.
+   ============================================================ */
+const CATEGORIAS = {
+  bot: {
+    icon: '🤖', nombre: 'Bot',
+    subs: [
+      { icon: 'fas fa-comments',     label: 'Chat',    action: () => { cerrarCategoria(); enfocarInput(); } },
+      { icon: 'fas fa-circle-info',  label: 'Ayuda',   action: () => { cerrarCategoria(); sendMessage('ayuda'); } },
+      { icon: 'fas fa-broom',        label: 'Limpiar', action: () => { cerrarCategoria(); limpiarChat(); } }
+    ]
+  },
+  inventario: {
+    icon: '📦', nombre: 'Inventario',
+    subs: [
+      { icon: 'fas fa-boxes-stacked',         label: 'Stock',       action: () => abrirSubcomando('stock') },
+      { icon: 'fas fa-chart-line',            label: 'Ventas',      action: () => abrirSubcomando('ventas') },
+      { icon: 'fas fa-triangle-exclamation',  label: 'Sobreventa',  action: () => abrirSubcomando('sobreventa') },
+      { icon: 'fas fa-truck',                 label: 'Por recibir', action: () => abrirSubcomando('porRecibir') },
+      { icon: 'fas fa-arrow-right-arrow-left',label: 'Traslados',   action: () => abrirSubcomando('traslados') }
+    ]
+  },
+  checador: {
+    icon: '⏰', nombre: 'Checador',
+    subs: [
+      { icon: 'fas fa-fingerprint',     label: 'Asistencia',   action: () => abrirSubcomando('asistencia') },
+      { icon: 'fas fa-trophy',          label: 'Bono',         action: () => abrirSubcomando('bono') },
+      { icon: 'fas fa-clock',           label: 'Retardos',     action: () => abrirSubcomando('retardos') },
+      { icon: 'fas fa-user-times',      label: 'Faltas',       action: () => abrirSubcomando('faltas') },
+      { icon: 'fas fa-umbrella-beach',  label: 'Vacaciones',   action: () => abrirSubcomando('vacaciones') },
+      { icon: 'fas fa-notes-medical',   label: 'Enfermedades', action: () => abrirSubcomando('enfermedades') },
+      { icon: 'fas fa-dumbbell',        label: 'Gym',          action: () => abrirSubcomando('gym') }
+    ]
+  },
+  precios: {
+    icon: '💰', nombre: 'Precios',
+    subs: [
+      { icon: 'fas fa-circle-exclamation', label: 'Erróneos',    action: () => abrirSubcomando('preciosErroneos') },
+      { icon: 'fas fa-user-tag',           label: 'Vendedores',  action: () => abrirSubcomando('vendedoresIncorrectos') }
+    ]
+  },
+  marketplaces: {
+    icon: '📊', nombre: 'Marketplaces',
+    subs: [
+      { icon: 'fas fa-store',      label: 'Ventiapp', action: () => abrirSubcomando('ventiapp') },
+      { icon: 'fas fa-bullseye',   label: 'Killers',  action: () => abrirSubcomando('killers') }
+    ]
   }
+};
+
+function abrirCategoria(catId) {
+  const cat = CATEGORIAS[catId];
+  if (!cat) return;
+  document.getElementById('modal-categoria-icon').textContent = cat.icon;
+  document.getElementById('modal-categoria-nombre').textContent = cat.nombre;
+  const grid = document.getElementById('subcomandos-grid');
+  grid.innerHTML = '';
+  cat.subs.forEach(s => {
+    const b = document.createElement('button');
+    b.className = 'subcomando';
+    b.innerHTML = '<i class="'+s.icon+'"></i><span>'+s.label+'</span>';
+    b.addEventListener('click', s.action);
+    grid.appendChild(b);
+  });
+  document.getElementById('modal-categoria').classList.add('active');
 }
+function cerrarCategoria() {
+  document.getElementById('modal-categoria').classList.remove('active');
+}
+function cerrarCategoriaBackdrop(ev) {
+  if (ev.target.id === 'modal-categoria') cerrarCategoria();
+}
+function abrirSubcomando(cmdId) {
+  // Cerrar el modal de categorías y abrir el modal de filtros (existente)
+  // para el comando seleccionado. abrirFiltros() ya existe y maneja el flujo.
+  cerrarCategoria();
+  abrirFiltros(cmdId);
+}
+
+// Stubs para compatibilidad: si quedó algún código que llamaba al sidebar,
+// que no truene. Antes hacían toggle del sidebar, ahora son no-op.
+function toggleSidebar() {}
+function cerrarSidebarSiMobile() {}
 
 /* ============================================================
    CHAT — referencias DOM
