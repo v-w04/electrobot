@@ -311,6 +311,16 @@ body.girly-mode .logo-img {
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
 }
 .topbar-btn.small { padding: 10px; font-size: calc(13px * var(--fs)); }
+/* Variante icon-only: cuadrado, sin texto. Se usa para el botón Inicio
+   en la topbar (a la izquierda del avatar). Ancho = alto para que se vea
+   como un ícono compacto en lugar de un botón ancho con padding lateral. */
+.topbar-btn.icon-only {
+  padding: 0;
+  width: 40px; height: 40px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: calc(15px * var(--fs));
+  flex-shrink: 0;
+}
 
 /* Botón Instalar PWA */
 .install-btn {
@@ -1339,8 +1349,12 @@ body.girly-mode .mobile-menu-btn {
    ============================================================ */
 .tableros-header {
   display: flex; align-items: center; justify-content: flex-start;
-  margin: 22px 0 12px;
+  margin: 22px auto 12px;
+  /* Mismo max-width que .suggestions-header (1200px) para que la etiqueta
+     "CATEGORÍAS" quede alineada visualmente con "ATAJOS RÁPIDOS" debajo. */
   width: 100%;
+  max-width: 1200px;
+  padding: 0 4px;
 }
 .tableros-label {
   font-size: calc(11px * var(--fs));
@@ -1351,10 +1365,14 @@ body.girly-mode .mobile-menu-btn {
 }
 .tableros-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+  /* Mismo ancho que .suggestions (1200px) para que tableros y atajos queden
+     centrados y alineados entre sí. Sin esto las tarjetas se ven pegadas
+     al borde izquierdo del welcome. */
   width: 100%;
-  margin-bottom: 8px;
+  max-width: 1200px;
+  margin: 0 auto 8px;
 }
 .tablero {
   position: relative;
@@ -1505,10 +1523,11 @@ body.girly-mode .mobile-menu-btn {
     padding: 10px 14px 10px 74px;
     border-radius: 12px;
   }
-  .topbar-left { gap: 10px; }
+  .topbar-left { gap: 8px; }
   .topbar-left h2 { font-size: calc(15px * var(--fs)); line-height: 1.2; }
   .topbar-left p { font-size: calc(11px * var(--fs)); }
   .bot-avatar { width: 34px; height: 34px; font-size: calc(15px * var(--fs)); }
+  .topbar-btn.icon-only { width: 34px; height: 34px; font-size: calc(13px * var(--fs)); }
 
   /* Chat ocupa todo el espacio restante; composer queda pegado abajo */
   .chat-frame { margin: 0 8px 8px; border-radius: 12px; }
@@ -1657,6 +1676,15 @@ body.girly-mode .typing span { background: #BA8FFF; }
     <!-- Topbar -->
     <div class="topbar">
       <div class="topbar-left">
+        <!-- Botón Inicio: limpia el chat y vuelve a la pantalla de bienvenida.
+             Está aquí (a la izquierda del avatar) porque cuando hay una
+             conversación abierta no había forma de regresar sin pasar por
+             el menú de categorías → Bot → Limpiar. Esto lo hace en 1 toque. -->
+        <button class="topbar-btn icon-only" id="btn-inicio"
+                onclick="limpiarChat()" title="Volver al inicio"
+                aria-label="Volver al inicio">
+          <i class="fas fa-house"></i>
+        </button>
         <div class="bot-avatar">
           <i class="fas fa-robot"></i>
         </div>
@@ -2134,19 +2162,21 @@ function rangoQuick(quick) {
       fin.setDate(fin.getDate() + 1);
       break;
     case 'esta-semana':
-      // Lunes a domingo de esta semana
+      // Lunes a VIERNES de esta semana (días hábiles).
+      // Antes iba lunes a domingo (+6) pero los reportes de asistencia,
+      // vacaciones, retardos, faltas, etc. son todos sobre días laborales.
       const diaSem = hoy.getDay() || 7; // 0=domingo → 7
       ini.setDate(hoy.getDate() - (diaSem - 1));
       fin.setTime(ini.getTime());
-      fin.setDate(ini.getDate() + 6);
+      fin.setDate(ini.getDate() + 4);
       break;
     case 'semana-siguiente':
-      // Lunes a domingo de la PRÓXIMA semana
+      // Lunes a VIERNES de la PRÓXIMA semana (días hábiles)
       const diaSemS = hoy.getDay() || 7; // 0=domingo → 7
       ini.setDate(hoy.getDate() - (diaSemS - 1) + 7);
-      // fin = ini + 6 días (derivado de ini para no cruzar mal de mes)
+      // fin = ini + 4 días (viernes — derivado de ini para no cruzar mal de mes)
       fin.setTime(ini.getTime());
-      fin.setDate(ini.getDate() + 6);
+      fin.setDate(ini.getDate() + 4);
       break;
     case 'este-mes':
       ini.setDate(1);
