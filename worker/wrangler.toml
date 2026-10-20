@@ -1,0 +1,23 @@
+# ============================================================
+#  electronics-bot — Cloudflare Worker
+# ============================================================
+#  Deploy:  cd worker && wrangler deploy
+#
+#  AQUI NO VA NINGUNA CREDENCIAL. Los secretos viven en
+#  Cloudflare (wrangler secret put) y los pone 1-INSTALAR-WRANGLER.bat:
+#
+#    TELEGRAM_TOKEN            token del bot de BotFather
+#    TELEGRAM_WEBHOOK_SECRET   cabecera que valida que Telegram llamo
+#    GOOGLE_SA_JSON            (opcional) cuenta de servicio para hojas no publicas
+# ============================================================
+
+name = "electronics-bot"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+# Workers AI — lo usa el modo conversacion del bot (env.AI).
+[ai]
+binding = "AI"
+
+[observability]
+enabled = true

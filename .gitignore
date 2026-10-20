@@ -1,0 +1,28 @@
+# ============================================================
+#  Lo que NUNCA se sube
+# ============================================================
+# Credenciales. El repo es publico y git guarda el historial
+# para siempre: una llave subida hay que rotarla, no borrarla.
+.env
+.env.*
+secretos.txt
+secretos/
+*.key
+*.pem
+sa.json
+service-account.json
+google-sa.json
+worker/sa.json
+
+# Sesion y cache de wrangler
+.wrangler/
+node_modules/
+.dev.vars
+
+# Basura del sistema
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Respaldos viejos (el Cloudflare.txt tenia el token)
+_to_delete/

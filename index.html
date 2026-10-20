@@ -1732,22 +1732,17 @@ body.girly-mode .typing span { background: #BA8FFF; }
               <button class="tablero" onclick="abrirCategoria('inventario')">
                 <div class="tablero-icon">📦</div>
                 <div class="tablero-titulo">Inventario</div>
-                <div class="tablero-sub">Stock · Ventas · Traslados</div>
-              </button>
-              <button class="tablero" onclick="abrirCategoria('checador')">
-                <div class="tablero-icon">⏰</div>
-                <div class="tablero-titulo">Checador</div>
-                <div class="tablero-sub">Asistencia · Bono · Faltas</div>
+                <div class="tablero-sub">Stock · Ventas · Sobreventa</div>
               </button>
               <button class="tablero" onclick="abrirCategoria('precios')">
                 <div class="tablero-icon">💰</div>
                 <div class="tablero-titulo">Precios</div>
-                <div class="tablero-sub">Erróneos · Vendedores</div>
+                <div class="tablero-sub">Erróneos · Consulta</div>
               </button>
               <button class="tablero" onclick="abrirCategoria('marketplaces')">
-                <div class="tablero-icon">📊</div>
-                <div class="tablero-titulo">Marketplaces</div>
-                <div class="tablero-sub">Ventiapp · Killers</div>
+                <div class="tablero-icon">🔪</div>
+                <div class="tablero-titulo">Killers</div>
+                <div class="tablero-sub">Walmart · Vigentes</div>
               </button>
             </div>
 
@@ -1902,7 +1897,6 @@ body.girly-mode .typing span { background: #BA8FFF; }
    CONFIGURACIÓN — ajusta WORKER_URL si cambia tu Worker
    ============================================================ */
 const WORKER_URL = 'https://electronics-bot.victor-walmart-04.workers.dev/api/query';
-const WORKER_EMPLEADOS_URL = 'https://electronics-bot.victor-walmart-04.workers.dev/api/empleados';
 
 /* ID de sesión persistente por navegador */
 const SESSION_ID = (function() {
@@ -1947,7 +1941,7 @@ const COMANDOS = {
     titulo: 'Ventas',
     icono: 'fa-chart-line',
     filtros: { fechas: true, sku: true, skuOpcional: true, skuLabel: 'Canal o SO (opcional)',
-               skuHint: 'Ej: <code>walmart</code>, <code>amazon</code>, <code>S00123</code>' },
+               skuHint: 'Ej: <code>walmart</code>, <code>cva</code>, <code>S00123</code>' },
     build: f => {
       const parts = ['venta'];
       if (f.sku) parts.push(f.sku);
@@ -1962,95 +1956,6 @@ const COMANDOS = {
     filtros: { sku: true, skuOpcional: true, skuLabel: 'SKU o cliente (opcional)' },
     build: f => 'sobreventa' + (f.sku ? ' ' + f.sku : '')
   },
-  porRecibir: {
-    titulo: 'Por recibir',
-    icono: 'fa-truck',
-    filtros: { sku: true, skuOpcional: true, skuLabel: 'SKU o proveedor (opcional)' },
-    build: f => 'por recibir' + (f.sku ? ' ' + f.sku : '')
-  },
-  traslados: {
-    titulo: 'Traslados',
-    icono: 'fa-arrow-right-arrow-left',
-    filtros: { fechas: true, sku: true, skuOpcional: true, skuLabel: 'Canal/SO (opcional)' },
-    build: f => {
-      const parts = ['traslados'];
-      if (f.sku) parts.push(f.sku);
-      const p = fmtPeriodo(f);
-      if (p) parts.push(p);
-      return parts.join(' ');
-    }
-  },
-
-  // ============== CHECADOR ==============
-  asistencia: {
-    titulo: 'Asistencia',
-    icono: 'fa-fingerprint',
-    filtros: { fechas: true, empleado: true, empleadoOpcional: true },
-    build: f => {
-      // Si NO se eligió empleado: usar comando "checador" que da reporte global
-      // Si SÍ se eligió: usar "asistencia <empleado> <fecha>" (el bot extrae fecha primero,
-      //                  el resto es el nombre)
-      const cmd = f.empleado ? ('asistencia ' + f.empleado) : 'checador';
-      const p = fmtPeriodo(f);
-      return p ? (cmd + ' ' + p) : cmd;
-    }
-  },
-  bono: {
-    titulo: 'Bono de puntualidad',
-    icono: 'fa-trophy',
-    filtros: {}, // sin filtros — el bot lo calcula por todo el periodo cargado
-    build: () => 'bono puntualidad'
-  },
-  retardos: {
-    titulo: 'Retardos',
-    icono: 'fa-clock',
-    filtros: {}, // sin filtros — por quincena automático
-    build: () => 'retardos'
-  },
-  faltas: {
-    titulo: 'Faltas',
-    icono: 'fa-user-times',
-    filtros: { fechas: true, empleado: true, empleadoOpcional: true },
-    build: f => {
-      const parts = ['faltas'];
-      if (f.empleado) parts.push(f.empleado);
-      const p = fmtPeriodo(f);
-      if (p) parts.push(p);
-      return parts.join(' ');
-    }
-  },
-  vacaciones: {
-    titulo: 'Vacaciones',
-    icono: 'fa-umbrella-beach',
-    filtros: { fechas: true, empleado: true, empleadoOpcional: true,
-               fechasOpcional: true, fechasFuturo: true },
-    build: f => {
-      const parts = ['vacaciones'];
-      if (f.empleado) parts.push(f.empleado);
-      const p = fmtPeriodo(f);
-      if (p) parts.push(p);
-      return parts.join(' ');
-    }
-  },
-  enfermedades: {
-    titulo: 'Enfermedades',
-    icono: 'fa-notes-medical',
-    filtros: { fechas: true, empleado: true, empleadoOpcional: true,
-               fechasOpcional: true },
-    build: f => {
-      const parts = ['enfermedades'];
-      if (f.empleado) parts.push(f.empleado);
-      const p = fmtPeriodo(f);
-      if (p) parts.push(p);
-      return parts.join(' ');
-    }
-  },
-  gym: {
-    titulo: 'Gym',
-    icono: 'fa-dumbbell',
-    filtros: { empleado: true, empleadoOpcional: true },
-    build: f => f.empleado ? ('gym ' + f.empleado) : 'gym'
-  },
 
   // ============== PRECIOS ==============
   preciosErroneos: {
@@ -2062,68 +1967,24 @@ const COMANDOS = {
       return p ? ('precios erroneos ' + p) : 'precios erroneos';
     }
   },
-  vendedoresIncorrectos: {
-    titulo: 'Vendedores incorrectos',
-    icono: 'fa-user-tag',
-    filtros: { fechas: true, fechasOpcional: true },
-    build: f => {
-      const p = fmtPeriodo(f);
-      return p ? ('vendedores incorrectos ' + p) : 'vendedores incorrectos';
-    }
-  },
-
-  // ============== MARKETPLACES ==============
-  ventiapp: {
-    titulo: 'Ventiapp',
-    icono: 'fa-store',
-    filtros: { sku: true },
-    build: f => 'ventiapp ' + (f.sku || '').trim(),
+  precio: {
+    titulo: 'Consultar precio',
+    icono: 'fa-tag',
+    filtros: { sku: true, skuLabel: 'SKU, nombre o banda',
+               skuHint: 'Ej: <code>2061</code>, <code>HP</code>, <code>2061 minimo</code>, <code>4997 cva</code>' },
+    build: f => 'precio ' + (f.sku || '').trim(),
     requiere: ['sku']
   },
+
+  // ============== KILLERS ==============
   killers: {
-    titulo: 'Killers',
+    titulo: 'Killers Walmart',
     icono: 'fa-bullseye',
-    filtros: { sku: true, skuOpcional: true, skuLabel: 'SKU o filtro (opcional)' },
+    filtros: { sku: true, skuOpcional: true, skuLabel: 'SKU, KAM o estado (opcional)',
+               skuHint: 'Ej: <code>vigentes</code>, <code>por iniciar</code>, <code>Samsung</code>' },
     build: f => 'killers' + (f.sku ? ' ' + f.sku : '')
   }
 };
-
-/* ============================================================
-   LISTA DE EMPLEADOS — fetch & cache (1 hora)
-   ============================================================ */
-const EMPLEADOS_CACHE_KEY = 'em-bot-empleados';
-const EMPLEADOS_TTL_MS = 60 * 60 * 1000; // 1 hora
-let _empleadosCache = null;
-
-async function obtenerEmpleados() {
-  if (_empleadosCache) return _empleadosCache;
-
-  // Intentar leer del localStorage
-  try {
-    const raw = localStorage.getItem(EMPLEADOS_CACHE_KEY);
-    if (raw) {
-      const stored = JSON.parse(raw);
-      if (stored.ts && (Date.now() - stored.ts) < EMPLEADOS_TTL_MS) {
-        _empleadosCache = stored.empleados || [];
-        return _empleadosCache;
-      }
-    }
-  } catch(e) {}
-
-  // Refrescar desde el Worker
-  try {
-    const r = await fetch(WORKER_EMPLEADOS_URL);
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const data = await r.json();
-    _empleadosCache = data.empleados || [];
-    localStorage.setItem(EMPLEADOS_CACHE_KEY,
-      JSON.stringify({ ts: Date.now(), empleados: _empleadosCache }));
-    return _empleadosCache;
-  } catch(e) {
-    console.warn('No se pudieron cargar empleados:', e.message);
-    return [];
-  }
-}
 
 /* ============================================================
    MODAL DE FILTROS — abrir, prefill, cerrar, ejecutar
@@ -2283,19 +2144,6 @@ async function abrirFiltros(comandoId) {
     const labelEl = document.querySelector('#seccion-fechas .filter-label span');
     if (labelEl) labelEl.textContent = cfg.filtros.fechasOpcional
       ? 'Periodo (opcional)' : 'Periodo';
-  }
-
-  // Si necesita empleado, asegurar que la lista esté cargada
-  if (showEmpleado) {
-    const hint = document.getElementById('empleado-hint');
-    hint.textContent = 'Cargando lista...';
-    obtenerEmpleados().then(emps => {
-      const dl = document.getElementById('empleados-dl');
-      dl.innerHTML = emps.map(n => '<option value="'+n.replace(/"/g,'&quot;')+'">').join('');
-      hint.textContent = emps.length
-        ? emps.length + ' empleados · escribe para buscar (déjalo vacío para todos)'
-        : '(no se pudo cargar la lista)';
-    });
   }
 
   // Mostrar modal y enfocar primer input
@@ -2514,34 +2362,19 @@ const CATEGORIAS = {
     subs: [
       { icon: 'fas fa-boxes-stacked',         label: 'Stock',       action: () => abrirSubcomando('stock') },
       { icon: 'fas fa-chart-line',            label: 'Ventas',      action: () => abrirSubcomando('ventas') },
-      { icon: 'fas fa-triangle-exclamation',  label: 'Sobreventa',  action: () => abrirSubcomando('sobreventa') },
-      { icon: 'fas fa-truck',                 label: 'Por recibir', action: () => abrirSubcomando('porRecibir') },
-      { icon: 'fas fa-arrow-right-arrow-left',label: 'Traslados',   action: () => abrirSubcomando('traslados') }
-    ]
-  },
-  checador: {
-    icon: '⏰', nombre: 'Checador',
-    subs: [
-      { icon: 'fas fa-fingerprint',     label: 'Asistencia',   action: () => abrirSubcomando('asistencia') },
-      { icon: 'fas fa-trophy',          label: 'Bono',         action: () => abrirSubcomando('bono') },
-      { icon: 'fas fa-clock',           label: 'Retardos',     action: () => abrirSubcomando('retardos') },
-      { icon: 'fas fa-user-times',      label: 'Faltas',       action: () => abrirSubcomando('faltas') },
-      { icon: 'fas fa-umbrella-beach',  label: 'Vacaciones',   action: () => abrirSubcomando('vacaciones') },
-      { icon: 'fas fa-notes-medical',   label: 'Enfermedades', action: () => abrirSubcomando('enfermedades') },
-      { icon: 'fas fa-dumbbell',        label: 'Gym',          action: () => abrirSubcomando('gym') }
+      { icon: 'fas fa-triangle-exclamation',  label: 'Sobreventa',  action: () => abrirSubcomando('sobreventa') }
     ]
   },
   precios: {
     icon: '💰', nombre: 'Precios',
     subs: [
       { icon: 'fas fa-circle-exclamation', label: 'Erróneos',    action: () => abrirSubcomando('preciosErroneos') },
-      { icon: 'fas fa-user-tag',           label: 'Vendedores',  action: () => abrirSubcomando('vendedoresIncorrectos') }
+      { icon: 'fas fa-tag',                label: 'Precio',      action: () => abrirSubcomando('precio') }
     ]
   },
   marketplaces: {
-    icon: '📊', nombre: 'Marketplaces',
+    icon: '🔪', nombre: 'Killers',
     subs: [
-      { icon: 'fas fa-store',      label: 'Ventiapp', action: () => abrirSubcomando('ventiapp') },
       { icon: 'fas fa-bullseye',   label: 'Killers',  action: () => abrirSubcomando('killers') }
     ]
   }
@@ -2797,52 +2630,20 @@ document.querySelectorAll('.suggestion').forEach(b => {
                un botón para abrir el modal de filtros del módulo.
    ============================================================ */
 const POOL_ATAJOS = [
-  // ── HOY / DEL MOMENTO (lo que más se consulta a diario) ───────
-  { q: 'checador hoy',                icon: 'fa-fingerprint',          title: 'Asistencia de hoy',     sub: 'Quién vino, faltó o llegó tarde' },
-  { q: 'retardos hoy',                icon: 'fa-hourglass-half',       title: 'Retardos de hoy',       sub: 'Llegadas tarde del día' },
-  { q: 'faltas hoy',                  icon: 'fa-calendar-xmark',       title: 'Faltas de hoy',         sub: 'Ausentes del día' },
-  { q: 'puntuales hoy',               icon: 'fa-circle-check',         title: 'Puntuales hoy',         sub: 'Llegaron a tiempo' },
-  { q: 'vacaciones hoy',              icon: 'fa-umbrella-beach',       title: 'De vacaciones hoy',     sub: 'Quién no viene' },
-  { q: 'enfermedades hoy',            icon: 'fa-notes-medical',        title: 'Permisos de hoy',       sub: 'Médicos / personales' },
-
-  // ── SEMANA / MES (rangos útiles) ──────────────────────────────
-  { q: 'retardos esta semana',        icon: 'fa-clock',                title: 'Retardos esta semana',  sub: 'Acumulado semanal' },
-  { q: 'faltas esta semana',          icon: 'fa-user-xmark',           title: 'Faltas esta semana',    sub: 'Acumulado semanal' },
-  { q: 'vacaciones semana siguiente', icon: 'fa-calendar-week',        title: 'Vacaciones próximas',   sub: 'Semana siguiente' },
-  { q: 'vacaciones mes siguiente',    icon: 'fa-calendar-days',        title: 'Vacaciones del mes',    sub: 'Mes que viene' },
-  { q: 'retardos mes pasado',         icon: 'fa-clock-rotate-left',    title: 'Retardos mes pasado',   sub: 'Cierre del mes' },
-
   // ── ALERTAS / OPERACIÓN — siempre con filtro, NUNCA abiertas ──
-  // Filtros por canal (ML ELECTRONICS / WALMART son los principales)
+  // Filtros por canal (WALMART / CVA)
   // o por fecha (hoy / esta semana) para evitar resultados gigantes.
-  { q: 'sobreventa ml electronics',   icon: 'fa-triangle-exclamation', title: 'Sobreventa ML',         sub: 'ML Electronics' },
   { q: 'sobreventa walmart',          icon: 'fa-triangle-exclamation', title: 'Sobreventa Walmart',    sub: 'Walmart' },
   { q: 'sobreventa hoy',              icon: 'fa-bell',                 title: 'Sobreventa de hoy',     sub: 'Del día' },
-  { q: 'por recibir hoy',             icon: 'fa-truck',                title: 'Por recibir hoy',       sub: 'Mercancía del día' },
-  { q: 'por recibir esta semana',     icon: 'fa-truck-fast',           title: 'Por recibir semanal',   sub: 'Esta semana' },
-  { q: 'killers ml electronics',      icon: 'fa-crosshairs',           title: 'Killers ML',            sub: 'Urgentes ML Electronics' },
-  { q: 'killers walmart',             icon: 'fa-crosshairs',           title: 'Killers Walmart',       sub: 'Urgentes Walmart' },
+  { q: 'killers vigentes',            icon: 'fa-crosshairs',           title: 'Killers vigentes',      sub: 'Ofertas Walmart en curso' },
+  { q: 'killers por iniciar',         icon: 'fa-hourglass-start',      title: 'Killers por iniciar',   sub: 'Ofertas que arrancan' },
   { q: 'precios erroneos hoy',        icon: 'fa-tag',                  title: 'Precios erróneos hoy',  sub: 'Errores del día' },
-  { q: 'vendedores incorrectos hoy',  icon: 'fa-user-tie',             title: 'Vendedores hoy',        sub: 'Asignación del día' },
-  { q: 'ventiapp urgente',            icon: 'fa-bullhorn',             title: 'Urgentes por publicar', sub: 'Falta poco / urgente' },
-
-  // ── BONO / GYM (revisión rápida) ──────────────────────────────
-  { q: 'bono puntualidad',            icon: 'fa-trophy',               title: 'Bono puntualidad',      sub: 'Quién lo gana este mes' },
-  { q: 'gym',                         icon: 'fa-dumbbell',             title: 'Registro de gym',       sub: 'Beneficio del mes' },
-
-  // ── EQUIPO / EMPLEADOS ────────────────────────────────────────
-  { q: 'cumpleaños',                  icon: 'fa-cake-candles',         title: 'Cumpleaños del mes',    sub: 'Quién cumple este mes' },
-  { q: 'cumpleaños esta semana',      icon: 'fa-gift',                 title: 'Cumpleaños esta semana',sub: 'Próximos 7 días' },
-  { q: 'cumpleaños todos',            icon: 'fa-calendar-day',         title: 'Todos los cumpleaños',  sub: 'Calendario anual' },
-  { q: 'departamento',                icon: 'fa-sitemap',              title: 'Departamentos',         sub: 'Todos con sus empleados' },
+  { q: 'venta walmart hoy',           icon: 'fa-cart-shopping',        title: 'Venta Walmart hoy',     sub: 'Pedidos del día' },
+  { q: 'venta cva hoy',               icon: 'fa-truck-ramp-box',       title: 'Pedidos CVA hoy',       sub: 'Del día' },
 
   // ── GUÍAS CONVERSACIONALES ────────────────────────────────────
-  { type: 'guide', id: 'mis_vacaciones', icon: 'fa-question',          title: '¿Cómo veo mis vacaciones?', sub: 'Te explico cómo buscarte' },
-  { type: 'guide', id: 'mi_asistencia',  icon: 'fa-question',          title: '¿Cómo veo mi asistencia?',  sub: 'Tu resumen personal' },
-  { type: 'guide', id: 'mi_checador',    icon: 'fa-question',          title: '¿Cómo uso el checador?',    sub: 'Asistencia y rangos' },
   { type: 'guide', id: 'buscar_stock',   icon: 'fa-question',          title: '¿Cómo busco un producto?',  sub: 'Stock por SKU o nombre' },
-  { type: 'guide', id: 'buscar_bodega',  icon: 'fa-question',          title: '¿Cómo busco en bodega?',    sub: 'Stock por sucursal' },
-  { type: 'guide', id: 'ventiapp_ayuda', icon: 'fa-question',          title: '¿Para qué sirve Ventiapp?', sub: 'Analítica del marketplace' },
+  { type: 'guide', id: 'consultar_precio', icon: 'fa-question',        title: '¿Cómo consulto un precio?', sub: 'Mínimo, normal, máximo' },
 
   // ── AYUDA GENERAL ─────────────────────────────────────────────
   { q: 'ayuda',                       icon: 'fa-circle-info',          title: 'Ver todos los comandos', sub: 'Lista completa de funciones' }
@@ -2854,70 +2655,28 @@ const POOL_ATAJOS = [
    abrir el modal de filtros del sidebar (opcional).
    ============================================================ */
 const GUIAS = {
-  mis_vacaciones: {
-    titulo: '🏖️ Cómo ver tus vacaciones',
-    intro: 'Puedes consultar las vacaciones de cualquier empleado por nombre. Para verte a ti, escribe tu nombre después del comando — basta con tu primer nombre o apellido (sin acentos importa).',
-    ejemplos: [
-      { cmd: 'vacaciones Victor',                 label: '• Vacaciones de Victor' },
-      { cmd: 'vacaciones Samantha mes siguiente', label: '• Samantha · mes siguiente' },
-      { cmd: 'vacaciones Jasso semana siguiente', label: '• Jasso · semana siguiente' }
-    ],
-    filtroId: 'vacaciones',
-    filtroLabel: 'Abrir filtros de vacaciones'
-  },
-  mi_asistencia: {
-    titulo: '✅ Cómo ver tu asistencia',
-    intro: 'Usa <code>asistencia [tu nombre]</code> para tu historial individual, o <code>resumen [tu nombre]</code> para un balance del mes (asistencias, retardos, faltas, bono).',
-    ejemplos: [
-      { cmd: 'asistencia Victor',             label: '• Mi asistencia reciente' },
-      { cmd: 'resumen Victor',                label: '• Mi resumen del mes' },
-      { cmd: 'asistencia Victor mes pasado',  label: '• Mes pasado' }
-    ],
-    filtroId: 'asistencia',
-    filtroLabel: 'Abrir filtros de asistencia'
-  },
   buscar_stock: {
     titulo: '📦 Cómo buscar un producto',
-    intro: 'Escribe <code>stock</code> seguido del SKU, marca, modelo o palabra clave para buscar en inventario. Para buscar específicamente en bodegas, usa <code>bodega</code>.',
+    intro: 'Escribe <code>stock</code> seguido del SKU, marca, modelo o palabra clave. El inventario sale del Sheet Site (libre, reservado y en tránsito).',
     ejemplos: [
       { cmd: 'stock 4699',       label: '• Por SKU exacto' },
       { cmd: 'stock JBL',        label: '• Por marca' },
-      { cmd: 'bodega Samsung',   label: '• En bodega: bodega Samsung' }
+      { cmd: 'stock Canon, HP',  label: '• Varios términos' }
     ],
     filtroId: 'stock',
     filtroLabel: 'Abrir buscador de stock'
   },
-  buscar_bodega: {
-    titulo: '🏭 Cómo buscar en bodega',
-    intro: 'Usa <code>bodega</code> seguido del producto, SKU o código para ver disponibilidad por bodega/sucursal. Acepta múltiples términos con comas.',
+  consultar_precio: {
+    titulo: '🏷️ Cómo consultar un precio',
+    intro: 'Usa <code>precio</code> con el SKU (o los últimos 4 dígitos) o el nombre. Trae las tres bandas de EM — mínimo, normal y máximo — con su precio de Walmart. Agrega <code>minimo</code>, <code>normal</code>, <code>maximo</code> o <code>cva</code> para ver solo una.',
     ejemplos: [
-      { cmd: 'bodega 4699',        label: '• Por código de bodega' },
-      { cmd: 'bodega Samsung',     label: '• Por marca' },
-      { cmd: 'bodega Canon, HP',   label: '• Múltiples productos' }
-    ]
-  },
-  mi_checador: {
-    titulo: '📋 Cómo ver el checador',
-    intro: 'Usa <code>checador</code> para asistencia del día o agrega rango de fechas. En rango, el bot consolida por persona (asistencias, retardos, faltas, vacaciones).',
-    ejemplos: [
-      { cmd: 'checador hoy',                         label: '• Asistencia de hoy' },
-      { cmd: 'checador 16/05/2026 al 31/05/2026',    label: '• Rango con desglose' },
-      { cmd: 'faltas esta semana',                   label: '• Solo faltas semanales' }
+      { cmd: 'precio 2061',         label: '• Las tres bandas' },
+      { cmd: 'precio 2061 minimo',  label: '• Solo mínimo' },
+      { cmd: 'precio 4997 cva',     label: '• Master de CVA' }
     ],
-    filtroId: 'asistencia',
-    filtroLabel: 'Abrir filtros de asistencia'
+    filtroId: 'precio',
+    filtroLabel: 'Abrir consulta de precio'
   },
-  ventiapp_ayuda: {
-    titulo: '🛒 Para qué sirve Ventiapp',
-    intro: 'Ventiapp analiza tus marketplaces: productos urgentes, falta de stock, errores de canal. Usa filtros por canal (ML, Walmart) para evitar listas largas.',
-    ejemplos: [
-      { cmd: 'ventiapp urgente',       label: '• Urgentes por publicar' },
-      { cmd: 'killers ml electronics', label: '• Killers en ML' },
-      { cmd: 'sobreventa walmart',     label: '• Sobreventa Walmart' }
-    ],
-    filtroId: 'ventiapp',
-    filtroLabel: 'Abrir analítica Ventiapp'
-  }
 };
 
 function escAttr(s){ return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -3061,8 +2820,6 @@ window.addEventListener('load', () => {
   posicionarComposer('welcome');
   autoRefreshAtajos();
   procesarQueryParam();
-  // Precargar empleados en background para que el modal abra rápido
-  obtenerEmpleados();
   if (window.innerWidth > 768) messageInput.focus();
 });
 </script>
