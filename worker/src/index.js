@@ -1,6 +1,6 @@
 // ============================================================
 // ELECTRONICS MÉXICO - BOT (Telegram + app web)
-// Cloudflare Worker v8.1
+// Cloudflare Worker v8.2
 // Fuentes: SOLO dos libros de Google Sheets:
 //          Sheet Site (inventario, precios, Killers, Concentrado)
 //          Venta Diaria Odoo 2026 (ventas, alertas, killers, sobreventa)
@@ -14,7 +14,7 @@
 // Sello de version. El GET de la raiz lo devuelve y 5-SUBIR-TODO.bat lo
 // compara contra WORKER_VERSION de _config.bat: asi el verde solo sale si
 // Cloudflare de verdad esta sirviendo este codigo y no el anterior.
-const BOT_VERSION    = 'v8.1';
+const BOT_VERSION    = 'v8.2';
 
 let TELEGRAM_API     = '';     // se arma en cargarEnv() con env.TELEGRAM_TOKEN
 let GOOGLE_SA        = null;   // env.GOOGLE_SA_JSON parseado (cuenta de servicio)
@@ -1027,7 +1027,7 @@ async function cmdSobreventa(chatId, consulta) {
     const gg = function(r, k) { return l.c[k] >= 0 ? r[l.c[k]] : ''; };
     if (!actualizada && l.datos[0]) {
       const m = String(l.datos[0][0] || '').match(/actualizaci[oó]n:\s*(.+)$/i);
-      if (m) actualizada = m[1].trim();
+      if (m) actualizada = m[1].replace(/\s+Referencia\s*$/i, '').trim();
     }
     l.filas.forEach(function(r){
       const ref = String(gg(r,'REF') || '').trim();
@@ -1913,6 +1913,14 @@ function colPor(encabezados, alias) {
   for (const a of [].concat(alias)) {
     const i = enc.indexOf(normEnc(a));
     if (i !== -1) return i;
+  }
+  // Google (gviz) a veces pega una fila de aviso con la fila de encabezados en
+  // la 1a columna ("Ultima actualizacion: ... Referencia"): aceptar "termina en".
+  for (const a of [].concat(alias)) {
+    const n = normEnc(a);
+    if (!n) continue;
+    const j = enc.findIndex(function (e) { return e.length > n.length && e.slice(-(n.length + 1)) === ' ' + n && /actualizacion/.test(e); });
+    if (j !== -1) return j;
   }
   return -1;
 }
