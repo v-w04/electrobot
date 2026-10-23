@@ -23,4 +23,4 @@ set "WORKER_URL=https://electronics-bot.victor-walmart-04.workers.dev"
 REM Sello que devuelve el GET del worker. Tiene que coincidir con
 REM BOT_VERSION de worker\src\index.js: es lo que hace honesto el
 REM verde del 5 - si Cloudflare sirve codigo viejo, sale rojo.
-set "WORKER_VERSION=v8.3"
+set "WORKER_VERSION=v8.4"

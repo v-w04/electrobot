@@ -1,6 +1,6 @@
 // ============================================================
 // ELECTRONICS MÉXICO - BOT (Telegram + app web)
-// Cloudflare Worker v8.3
+// Cloudflare Worker v8.4
 // Fuentes: SOLO dos libros de Google Sheets:
 //          Sheet Site (inventario, precios, Killers, Concentrado)
 //          Venta Diaria Odoo 2026 (ventas, alertas, killers, sobreventa)
@@ -14,7 +14,7 @@
 // Sello de version. El GET de la raiz lo devuelve y 5-SUBIR-TODO.bat lo
 // compara contra WORKER_VERSION de _config.bat: asi el verde solo sale si
 // Cloudflare de verdad esta sirviendo este codigo y no el anterior.
-const BOT_VERSION    = 'v8.3';
+const BOT_VERSION    = 'v8.4';
 
 let TELEGRAM_API     = '';     // se arma en cargarEnv() con env.TELEGRAM_TOKEN
 let GOOGLE_SA        = null;   // env.GOOGLE_SA_JSON parseado (cuenta de servicio)
@@ -358,8 +358,9 @@ async function router(chatId, texto, nombre, env) {
 
   // ── PRECIOS ERRÓNEOS ───────────────────────────────────────────────
   // "precios erroneos" / "erroneos precios" / "alertas precios"
-  if (tiene(/precios?\s+err[oe]neos?/) || tiene(/err[oe]neos?\s+precios?/) || tiene(/alertas?\s+(?:de\s+)?precios?/)) {
-    const a = args('precios','precio','erroneos','erroneas','alertas','alerta','de');
+  // (tolera faltas de ortografia: "erroneao", "erroneo", "erronea", "errones"...)
+  if (tiene(/precios?\s+err[a-z]{3,9}\b/) || tiene(/\berr[a-z]{3,9}\s+precios?/) || tiene(/alertas?\s+(?:de\s+)?precios?/)) {
+    const a = args('precios','precio','erroneos','erroneas','alertas','alerta','de').replace(/\berr[a-z]{3,9}\b/g, ' ').replace(/\s+/g, ' ').trim();
     await cmdPreciosErroneos(chatId, a); return;
   }
 
@@ -810,7 +811,7 @@ async function cargarKillers() {
     sku = String(sku || '').trim().toUpperCase();
     if (!sku || !(precio > 0)) return;
     // KILLERS HISTORICO muestra INICIO solo como fecha (sin hora): ahí no hay
-    // colchón al inicio; la hoja Killers del site trae la hora y sí lo lleva.
+    // colchón al inicio; KILLERS ACTIVOS (Venta Diaria) trae la hora y sí lo lleva.
     const e = { precio: precio, ini: fechaMs(ini, false), fin: fechaMs(fin, true),
                 iniSinHora: !/\d{1,2}:\d{2}/.test(String(ini || '')) };
     const llaves = new Set([sku, String(general || '').trim().toUpperCase(), skuBaseVD(sku)]);
@@ -821,8 +822,8 @@ async function cargarKillers() {
   const fuentesKillers = [
     { id: ID.VENTA_DIARIA, hoja: 'KILLERS HISTORICO', ancla: 'PRECIO NEGOCIADO',
       cols: { sku: ['SKU'], general: ['SKU GENERAL'], precio: ['PRECIO NEGOCIADO'], ini: ['INICIO'], fin: ['FIN'] } },
-    { id: ID.SITE, hoja: 'Killers', ancla: 'NEGOCIADO',
-      cols: { sku: ['SKU'], general: ['SKU BASE'], precio: ['NEGOCIADO'], ini: ['INICIA'], fin: ['TERMINA'] } }
+    { id: ID.VENTA_DIARIA, hoja: 'KILLERS ACTIVOS', ancla: 'PRECIO NEGOCIADO',
+      cols: { sku: ['SKU'], general: ['SKU GENERAL'], precio: ['PRECIO NEGOCIADO'], ini: ['INICIO DE LA OFERTA'], fin: ['FINALIZACION DE LA OFERTA'] } }
   ];
   const lecturas = await Promise.all(fuentesKillers.map(function (f) {
     return leerHojaPorEncabezado(f.id, f.hoja, f.ancla, f.cols, ['sku', 'precio', 'ini', 'fin']);
