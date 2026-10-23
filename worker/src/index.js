@@ -1,6 +1,6 @@
 // ============================================================
 // ELECTRONICS MÉXICO - BOT (Telegram + app web)
-// Cloudflare Worker v8.2
+// Cloudflare Worker v8.3
 // Fuentes: SOLO dos libros de Google Sheets:
 //          Sheet Site (inventario, precios, Killers, Concentrado)
 //          Venta Diaria Odoo 2026 (ventas, alertas, killers, sobreventa)
@@ -14,7 +14,7 @@
 // Sello de version. El GET de la raiz lo devuelve y 5-SUBIR-TODO.bat lo
 // compara contra WORKER_VERSION de _config.bat: asi el verde solo sale si
 // Cloudflare de verdad esta sirviendo este codigo y no el anterior.
-const BOT_VERSION    = 'v8.2';
+const BOT_VERSION    = 'v8.3';
 
 let TELEGRAM_API     = '';     // se arma en cargarEnv() con env.TELEGRAM_TOKEN
 let GOOGLE_SA        = null;   // env.GOOGLE_SA_JSON parseado (cuenta de servicio)
@@ -1517,15 +1517,24 @@ const HOJAS_BOT = [
   ['SITE', 'Inventario Actual', 'inventario actual libre existencia reservado transito'],
   ['SITE', 'Inventario Negativo', 'inventario negativo serie ubicacion almacen cantidad'],
   ['SITE', 'Inventarios', 'inventarios stock disponible referencia marca modelo color existencias'],
+  ['SITE', 'Killers sin minimo', 'killers sin minimo kam falta recibimos cupon dias restantes actual'],
+  ['SITE', 'Ventas 30 dias', 'ventas 30 dias piezas vendidas ultimos mes sku producto'],
+  ['SITE', 'Cobro distinto', 'cobro distinto comision cobrada debida causa categoria pedidos pesos promo'],
+  ['SITE', 'Cobro distinto detalle', 'cobro distinto detalle pedido cobrado debido diferencia comision envio venta'],
+  ['SITE', 'Cancelaciones', 'cancelaciones cancelar odoo pedido orden compra estado entrega correo'],
+  ['SITE', 'Republicar', 'republicar sku viejo nuevo estado dias motivo origen fecha republicado'],
+  ['SITE', 'Sobreventa WFS', 'sobreventa wfs referencia documento origen qty demandada realizada cancelar odoo'],
+  ['SITE', 'Sobreventa Pick', 'sobreventa pick referencia documento origen qty demandada realizada cancelar odoo'],
   ['SITE', 'Catalogo', 'catalogo sku referencia nombre categoria'],
   ['VD', 'KILLERS ACTIVOS', 'killers activos vigentes por iniciar estado kam carga cupon negociado origen'],
-  ['VD', 'KILLERS BAJO MINIMO', 'killers bajo minimo perdida falta cupon kam departamento'],
+  ['VD', 'KILLERS BAJO MINIMO', 'killers bajo minimo perdida falta cupon kam departamento accion sugerida'],
   ['VD', 'KILLERS FUERA', 'killers fuera motivo bloqueado walmart minimo aplicable perdida'],
+  ['VD', 'CATEGORIA REVISAR', 'categoria revisar sku kam departamento tipo producto estado perdida'],
+  ['VD', 'COBRO DISTINTO', 'cobro distinto comision cobrada debida causa categoria pedidos pesos promo'],
+  ['VD', 'COBRO DISTINTO DETALLE', 'cobro distinto detalle pedido cobrado debido diferencia comision envio venta'],
+  ['VD', 'CASOS WALMART', 'casos walmart folio caso abierto motivo estado seguimiento resolucion correo precio cero'],
   ['VD', 'PRECIO LIBRE', 'precio libre sku motivo hasta vende mas barato'],
-  ['VD', 'KILLERS EXCLUIDOS', 'killers excluidos sku motivo hasta'],
-  ['VD', 'COMPARAR WALMART', 'comparar walmart decision dejar cambiar minimo aplicable carga diferencia estado stock'],
-  ['VD', 'CARGA KILLERS', 'carga killers reduccion puntos categoria'],
-  ['VD', 'COMISIONES', 'comisiones categoria comision otros nombres promo marcas'],
+  ['VD', 'COMPARAR WALMART', 'comparar walmart decision dejar cambiar minimo aplicable carga diferencia estado stock problema accion sugerida caso'],
   ['VD', 'KILLERS HISTORICO', 'killers historico carga septiembre octubre registrado recibimos negociado'],
   ['VD', 'WALMART', 'ventas venta walmart pedidos ordenes so vendedor importe'],
   ['VD', 'PEDIDOS CVA', 'ventas venta pedidos cva ordenes so vendedor importe'],
@@ -1539,6 +1548,36 @@ const HOJAS_BOT = [
   ['VD', 'MAXIMO', 'maximo precio maximo sku walmart'],
   ['VD', 'PRECIOS VARIACIONES', 'precios variaciones sku']
 ];
+// Catálogo vivo: si hay cuenta de servicio (GOOGLE_SA_JSON) el bot lee la lista
+// real de pestañas de los dos libros (cada 5 min), así una pestaña nueva se
+// puede consultar sin tocar el código. Sin cuenta de servicio usa la lista fija.
+let CAT_ = HOJAS_BOT;
+let _catTs = 0;
+const TAB_OCULTA_ = /^(_|log$|log |indice$|guia del menu$|kams|correo$|envios killers$)/;
+async function refrescarCatalogo_() {
+  if (Date.now() - _catTs < 300000) return;
+  _catTs = Date.now();
+  try {
+    const tok = await googleToken();
+    if (!tok) return;
+    const nuevo = [];
+    for (const k of ['SITE', 'VD']) {
+      const r = await fetch('https://sheets.googleapis.com/v4/spreadsheets/' + idLibro_(k) + '?fields=sheets.properties.title',
+        { headers: { Authorization: 'Bearer ' + tok } });
+      if (!r.ok) { console.error('catalogo ' + k + ': HTTP ' + r.status); return; }
+      const j = await r.json();
+      (j.sheets || []).forEach(function (sh) {
+        const t = sh.properties && sh.properties.title; if (!t) return;
+        const n = normEnc(t);
+        if (TAB_OCULTA_.test(n)) return;
+        const est = HOJAS_BOT.find(function (h) { return h[0] === k && normEnc(h[1]) === n; });
+        nuevo.push([k, t, est ? est[2] : t]);
+      });
+    }
+    if (nuevo.length) CAT_ = nuevo;
+  } catch (e) { console.error('catalogo: ' + e.message); }
+}
+
 // Pestañas que 'buscar' recorre (acotado para no pasar el límite de subrequests).
 const BUSCAR_EN = [['SITE','Concentrado'],['SITE','Variantes'],['SITE','Inventarios'],['SITE','Walmart EDI'],['SITE','Killers'],
                    ['VD','KILLERS ACTIVOS'],['VD','KILLERS HISTORICO'],['VD','PRECIOS ERIK']];
@@ -1554,14 +1593,14 @@ function palabrasClave_(texto) {
 function raiz_(w) { return w.length > 5 ? w.replace(/(es|s)$/, '') : w; }
 
 function tabsPorNombre_(norm) {
-  return HOJAS_BOT.filter(function (h) { return norm.indexOf(normEnc(h[1])) !== -1; });
+  return CAT_.filter(function (h) { return norm.indexOf(normEnc(h[1])) !== -1; });
 }
 // Puntúa cada pestaña contra las palabras de la pregunta.
 function mejoresTabs_(pregunta, max) {
   const pal = palabrasClave_(pregunta);
   if (!pal.length) return [];
   const norm = normEnc(pregunta);
-  const puntos = HOJAS_BOT.map(function (h) {
+  const puntos = CAT_.map(function (h) {
     const claves = normEnc(h[1] + ' ' + h[2]).split(' ');
     let p = 0;
     pal.forEach(function (w) {
@@ -1624,16 +1663,18 @@ async function cargarTab_(libro, pestana) {
 }
 
 async function cmdHojas(chatId) {
+  await refrescarCatalogo_();
   let tg = '📚 <b>Pestañas que puedo consultar</b>\n<i>hoja &lt;nombre&gt; [filtro]</i> · <i>buscar &lt;texto&gt;</i> · o pregúntame en español\n━━━━━━━━━━━━━━━━━\n';
   ['SITE', 'VD'].forEach(function (k) {
     tg += '\n<b>' + LIBROS_BOT[k].nombre + '</b>\n';
-    tg += HOJAS_BOT.filter(function (h) { return h[0] === k; }).map(function (h) { return '<code>' + esc(h[1]) + '</code>'; }).join(' · ') + '\n';
+    tg += CAT_.filter(function (h) { return h[0] === k; }).map(function (h) { return '<code>' + esc(h[1]) + '</code>'; }).join(' · ') + '\n';
   });
   tg += '\n<i>Ej:</i> <code>hoja killers activos vigente</code> · <code>hoja site oportunidades</code> · <code>buscar 3027</code>';
   await enviar(chatId, tg);
 }
 
 async function cmdHoja(chatId, consulta) {
+  await refrescarCatalogo_();
   let norm = normEnc(consulta);
   let libro = null;
   if (/\b(vd|venta diaria|ventadiaria)\b/.test(norm)) { libro = 'VD'; norm = norm.replace(/\b(vd|venta diaria|ventadiaria)\b/, ' '); }
@@ -1702,6 +1743,7 @@ function esPregunta_(texto) {
 // Devuelve true si respondió. Elige pestaña(s) por las palabras de la pregunta,
 // trae los datos REALES y le pide a la IA que conteste solo con ellos.
 async function preguntarHojas(chatId, pregunta, env) {
+  await refrescarCatalogo_();
   const tabs = mejoresTabs_(pregunta, 2);
   if (!tabs.length) return false;
   const pal = palabrasClave_(pregunta);
