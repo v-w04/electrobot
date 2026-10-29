@@ -1,6 +1,6 @@
 // ============================================================
 // ELECTRONICS MÉXICO - BOT (Telegram + app web)
-// Cloudflare Worker v8.4
+// Cloudflare Worker v8.6
 // Fuentes: SOLO dos libros de Google Sheets:
 //          Sheet Site (inventario, precios, Killers, Concentrado)
 //          Venta Diaria Odoo 2026 (ventas, alertas, killers, sobreventa)
@@ -14,7 +14,7 @@
 // Sello de version. El GET de la raiz lo devuelve y 5-SUBIR-TODO.bat lo
 // compara contra WORKER_VERSION de _config.bat: asi el verde solo sale si
 // Cloudflare de verdad esta sirviendo este codigo y no el anterior.
-const BOT_VERSION    = 'v8.4';
+const BOT_VERSION    = 'v8.6';
 
 let TELEGRAM_API     = '';     // se arma en cargarEnv() con env.TELEGRAM_TOKEN
 let GOOGLE_SA        = null;   // env.GOOGLE_SA_JSON parseado (cuenta de servicio)
@@ -301,6 +301,14 @@ async function router(chatId, texto, nombre, env) {
     await cmdInventario(chatId, a); return;
   }
 
+  // ── COMANDOS DIRECTOS POR PESTAÑA (cancelaciones, wfs, republicar, casos…) ──
+  if (!tiene(/sobreventa/) || /^cancelaciones?\b/.test(tNorm)) {
+    if (/^parrillas?\b/.test(tNorm)) { await cmdParrilla_(chatId, tNorm); return; }
+    if (/^(envios?\s+wfs|envio)\b/.test(tNorm)) { await cmdEnvio_(chatId, tNorm); return; }
+    const sc = SUBCMD_.find(function (d) { return d.re.test(tNorm); });
+    if (sc) { await cmdTabla_(chatId, sc, tNorm); return; }
+  }
+
   // ── COMANDOS RETIRADOS (su hoja ya no existe) ─────────────────────
   if (tiene(/\bgym\b/) || tiene(/\bgimnasio\b/)) { await enviar(chatId, RETIRADO.gym); return; }
   if (tiene(/\bcheck\b/) || tiene(/checador/) || tiene(/\bretardos?\b/) || tiene(/culpables/) ||
@@ -312,7 +320,7 @@ async function router(chatId, texto, nombre, env) {
       (tiene(/^reporte\b/))) {
     await enviar(chatId, RETIRADO.checador); return;
   }
-  if (tiene(/traslados?/) || tiene(/rastreo/)) { await enviar(chatId, RETIRADO.traslados); return; }
+  if (tiene(/rastreo/)) { await enviar(chatId, RETIRADO.traslados); return; }
   if (tiene(/ventiapp/) || tiene(/sin\s+publicar/) || tiene(/falta\s+poco/) || tiene(/urgente\s+publicar/) ||
       (tiene(/stock/) && tiene(/venti/))) {
     await enviar(chatId, RETIRADO.ventiapp); return;
@@ -320,6 +328,7 @@ async function router(chatId, texto, nombre, env) {
 
   // ── PESTAÑAS DE LOS DOS LIBROS ─────────────────────────────────────
   if (/^hojas?$/.test(tNorm) || /^pestanas?$/.test(tNorm)) { await cmdHojas(chatId); return; }
+  if (/^columnas?\s/.test(tNorm)) { await cmdColumnas_(chatId, tNorm.replace(/^columnas?\s+/, '')); return; }
   if (/^hoja\s/.test(tNorm)) { await cmdHoja(chatId, tNorm.replace(/^hoja\s+/, '')); return; }
   if (/^buscar\s/.test(tNorm)) { await cmdBuscar(chatId, tNorm.replace(/^buscar\s+/, '')); return; }
   // Preguntas en español sobre los datos ("cuántos killers vigentes hay?")
@@ -402,7 +411,8 @@ async function router(chatId, texto, nombre, env) {
   // cortas como "rh" o "ti").
   const COMANDOS_CONOCIDOS = [
     'ayuda','comandos','stock','venta','ventas','precio','precios',
-    'sobreventa','killers','killer','sku','hojas','hoja','buscar'
+    'sobreventa','killers','killer','sku','hojas','hoja','buscar',
+    'cancelaciones','republicar','casos','traslados','parrilla','parrillas','oportunidades','promociones','comisiones','variantes','comparar','bloqueados','publicaciones','autorizaciones','restricciones','historico','columnas','kams','correo','choferes','camionetas'
   ];
   const palabras1 = tNorm.split(/\s+/);
   const primeraP = palabras1[0] || '';
@@ -434,8 +444,8 @@ async function router(chatId, texto, nombre, env) {
     // Intentar inventario primero
     const hayResultados = await cmdInventarioBuscando(chatId, texto);
     if (!hayResultados) {
-      // ¿habla de algo que está en las pestañas? responder con datos reales
-      if (await preguntarHojas(chatId, texto, env)) return;
+      // ¿habla de algo que está en las pestañas? responder con datos reales (sin enrutador de IA)
+      if (await preguntarHojas(chatId, texto, env, false)) return;
       // Sin resultados en inventario → AI
       await preguntarGemini(chatId, texto, env);
     }
@@ -1461,11 +1471,22 @@ async function ayuda(chatId, nombre) {
     '<b>🚨 SOBREVENTA</b> <i>(Venta Diaria · Sobreventa WFS y Pick)</i>\n'+
     '<code>sobreventa</code> · <code>sobreventa hoy</code> · <code>sobreventa SONY</code>\n\n'+
 
+    '<b>🧰 TODO SITE SHEET + VENTA DIARIA</b> <i>(comando directo por pestaña)</i>\n'+
+    '🚫 <code>cancelaciones</code> · ♻️ <code>republicar</code> · 📈 <code>ventas 30 dias</code> · 🚛 <code>traslados</code>\n'+
+    '🚚 <code>wfs</code> · <code>envio</code> · <code>historico envios</code> · <code>autorizaciones</code> · <code>restricciones</code>\n'+
+    '📂 <code>casos walmart</code> · ⚖️ <code>comparar walmart</code> · 💸 <code>cobro distinto</code>\n'+
+    '📉 <code>killers bajo minimo</code> · <code>killers sin minimo</code> · <code>killers fuera</code> · <code>estado killers</code> · <code>historico killers</code>\n'+
+    '🧩 <code>parrilla audio</code> (también computacion, tv, fotografia…) · 💡 <code>oportunidades</code> · 🔗 <code>edi</code> · 🧬 <code>variantes</code>\n'+
+    '🔁 <code>cambio walmart</code> · 🎁 <code>promociones</code> · 💰 <code>comisiones</code> · 🏷️ <code>catalogo cva</code> · 🔒 <code>bloqueados</code>\n'+
+    '<i>Todos aceptan palabras para filtrar:</i> <code>cancelaciones sobreventa</code> · <code>casos por abrir</code>\n\n'+
     '<b>📚 CUALQUIER PESTAÑA</b> <i>(los dos libros)</i>\n'+
     '<code>hojas</code> — lista de pestañas consultables\n'+
     '<code>hoja killers activos vigente</code> — filas de una pestaña con filtro\n'+
     '<code>buscar 3027</code> — busca en las pestañas principales\n'+
-    '<code>cuántos killers vigentes hay?</code> — pregunta en español, responde con datos reales\n\n'+
+    '<code>columnas cancelaciones</code> — encabezados (con su letra), llenado y ejemplo de cualquier pestaña\n'+
+    '<code>cancelaciones todo</code> · <code>cancelaciones pag 2</code> — ver más filas de cualquier comando\n'+
+    '<code>log</code> · <code>log ventas</code> · <code>kams</code> · <code>correo</code> · <code>envios killers</code> · <code>indice</code> · <code>guia</code> — también están expuestos\n'+
+    '<code>cuántos killers vigentes hay?</code> — pregunta en español: la IA elige las pestañas, el bot calcula conteos y sumas exactos y razona la respuesta\n\n'+
 
     '━━━━━━━━━━━━━━━━━\n'+
     '💡 <b>Reglas generales:</b>\n'+
@@ -1526,6 +1547,49 @@ const HOJAS_BOT = [
   ['SITE', 'Republicar', 'republicar sku viejo nuevo estado dias motivo origen fecha republicado'],
   ['SITE', 'Sobreventa WFS', 'sobreventa wfs referencia documento origen qty demandada realizada cancelar odoo'],
   ['SITE', 'Sobreventa Pick', 'sobreventa pick referencia documento origen qty demandada realizada cancelar odoo'],
+  ['SITE', 'Estado Killers', 'estado killers decision kam vigente por iniciar parrilla solicitud'],
+  ['SITE', 'SKU enviados killers', 'sku enviados killers kam envio correo'],
+  ['SITE', 'WFS', 'wfs envio preparacion msi clasica enviar piezas stock ventas 30 dias gtin categoria'],
+  ['SITE', 'ENVIO 21 03/11/26', 'envio wfs 21 hoja de envio chofer camioneta piezas sku'],
+  ['SITE', 'HISTORICO ENVIOS', 'historico envios wfs envio fecha sku piezas'],
+  ['SITE', 'HISTORICO CAMIONETAS', 'historico camionetas envio placas'],
+  ['SITE', 'CATALOGO CAMIONETAS', 'catalogo camionetas placas color tipo'],
+  ['SITE', 'Traslados Odoo', 'traslados odoo almacen transferencia origen destino estado referencia'],
+  ['SITE', 'Autorizaciones WFS', 'autorizaciones wfs autorizado sku permiso'],
+  ['SITE', 'Restricciones WFS', 'restricciones wfs restringido sku motivo'],
+  ['SITE', 'Salud', 'salud libro revision automatica errores estado'],
+  ['SITE', 'Parrilla AUDIO', 'parrilla audio killers kam decision solicitud departamento'],
+  ['SITE', 'Parrilla AUTOMOTRIZ', 'parrilla automotriz killers kam decision solicitud departamento'],
+  ['SITE', 'Parrilla BELLEZA', 'parrilla belleza killers kam decision solicitud departamento'],
+  ['SITE', 'Parrilla COMPUTACION', 'parrilla computacion killers kam decision solicitud departamento'],
+  ['SITE', 'Parrilla ELECTRODOMESTICOS', 'parrilla electrodomesticos killers kam decision solicitud departamento'],
+  ['SITE', 'Parrilla FERRETERIA', 'parrilla ferreteria killers kam decision solicitud departamento'],
+  ['SITE', 'Parrilla FOTOGRAFIA', 'parrilla fotografia killers kam decision solicitud departamento'],
+  ['SITE', 'Parrilla JUGUETERIA', 'parrilla jugueteria killers kam decision solicitud departamento'],
+  ['SITE', 'Parrilla TV', 'parrilla tv killers kam decision solicitud departamento'],
+  ['SITE', 'Parrilla VIDEOJUEGOS', 'parrilla videojuegos killers kam decision solicitud departamento'],
+  ['SITE', 'Log', 'log registro errores etapa nivel mensaje detalles json corridas automaticas'],
+  ['SITE', '📑 Índice', 'indice libro lista de pestañas'],
+  ['SITE', '📖 Guía del menú', 'guia menu opciones que hace cuando usarla nivel'],
+  ['SITE', 'KAMS', 'kams grupo kam nombre correo confirmado'],
+  ['SITE', 'KAMS Departamentos', 'kams departamentos departamento grupo kam categoria'],
+  ['SITE', 'Correo', 'correo asunto plantilla cuerpo killers cambio de precio'],
+  ['SITE', 'Envios killers', 'envios killers fecha modo grupo kam para killers estado correo enviado'],
+  ['SITE', 'CATALOGO CHOFERES', 'catalogo choferes chofer curp contacto'],
+  ['SITE', 'HISTORICO CHOFERES', 'historico choferes chofer envio curp contacto'],
+  ['SITE', '_Marcas', 'marcas prefijo marca'],
+  ['SITE', '_Marcas Excepciones', 'marcas excepciones prefijo nombre trae marca'],
+  ['SITE', '_Colores', 'colores codigo color'],
+  ['SITE', '_CancelOdoo', 'cancelodoo odoo campos modelo boton relacion cancelacion'],
+  ['SITE', '_CatalogoTmp', 'catalogo temporal tmp sku gtin'],
+  ['SITE', 'WFS RESPALDO 2026-10-26 1008', 'respaldo wfs 26 octubre'],
+  ['SITE', 'WFS RESPALDO 2026-10-27 1135', 'respaldo wfs 27 octubre'],
+  ['SITE', 'WFS RESPALDO 2026-10-28 1235', 'respaldo wfs 28 octubre'],
+  ['VD', 'LOG Ventas', 'log ventas registro etapa nivel mensaje detalles corridas automaticas sobreventa'],
+  ['VD', '📑 Índice', 'indice libro lista de pestañas'],
+  ['VD', '📖 Guía del menú', 'guia menu opciones que hace cuando usarla nivel'],
+  ['VD', 'KILLERS PEGAR', 'killers pegar area de pegado'],
+  ['VD', 'EXCEPCIONES CATEGORIA', 'excepciones categoria'],
   ['SITE', 'Catalogo', 'catalogo sku referencia nombre categoria'],
   ['VD', 'KILLERS ACTIVOS', 'killers activos vigentes por iniciar estado kam carga cupon negociado origen'],
   ['VD', 'KILLERS BAJO MINIMO', 'killers bajo minimo perdida falta cupon kam departamento accion sugerida'],
@@ -1554,7 +1618,7 @@ const HOJAS_BOT = [
 // puede consultar sin tocar el código. Sin cuenta de servicio usa la lista fija.
 let CAT_ = HOJAS_BOT;
 let _catTs = 0;
-const TAB_OCULTA_ = /^(_|log$|log |indice$|guia del menu$|kams|correo$|envios killers$)/;
+const TAB_OCULTA_ = /^$/;   // control total: no se oculta ninguna pestaña
 async function refrescarCatalogo_() {
   if (Date.now() - _catTs < 300000) return;
   _catTs = Date.now();
@@ -1581,7 +1645,10 @@ async function refrescarCatalogo_() {
 
 // Pestañas que 'buscar' recorre (acotado para no pasar el límite de subrequests).
 const BUSCAR_EN = [['SITE','Concentrado'],['SITE','Variantes'],['SITE','Inventarios'],['SITE','Walmart EDI'],['SITE','Killers'],
-                   ['VD','KILLERS ACTIVOS'],['VD','KILLERS HISTORICO'],['VD','PRECIOS ERIK']];
+                   ['SITE','Cancelaciones'],['SITE','Republicar'],['SITE','Cruce EDI'],['SITE','Estado Killers'],['SITE','WFS'],
+                   ['SITE','Oportunidades'],['SITE','Ventas 30 dias'],['SITE','Bloqueados'],
+                   ['VD','KILLERS ACTIVOS'],['VD','KILLERS HISTORICO'],['VD','PRECIOS ERIK'],['VD','COMPARAR WALMART'],
+                   ['VD','CASOS WALMART'],['VD','KILLERS BAJO MINIMO'],['VD','Histórico de alertas']];
 
 const STOP_ = new Set(['cuantos','cuantas','cuanto','cual','cuales','que','quien','quienes','como','donde','cuando','hay','tiene','tienen',
   'los','las','del','por','para','con','una','uno','unos','unas','dame','muestrame','lista','listame','dime','todos','todas','esta','este',
@@ -1681,6 +1748,7 @@ async function cmdHoja(chatId, consulta) {
   if (/\b(vd|venta diaria|ventadiaria)\b/.test(norm)) { libro = 'VD'; norm = norm.replace(/\b(vd|venta diaria|ventadiaria)\b/, ' '); }
   else if (/\b(site|sheet site)\b/.test(norm)) { libro = 'SITE'; norm = norm.replace(/\b(sheet site|site)\b/, ' '); }
   norm = norm.replace(/\s+/g, ' ').trim();
+  const pg = parsePag_(norm); norm = pg.resto;
   if (!norm) { await cmdHojas(chatId); return; }
 
   let cand = tabsPorNombre_(norm);
@@ -1704,13 +1772,15 @@ async function cmdHoja(chatId, consulta) {
   if (!t) { await enviar(chatId, '❌ Sin acceso a esa pestaña.'); return; }
   const res = filtro.length ? t.filas.filter(function (r) { return coincideFila_(r, filtro); }) : t.filas;
   if (!res.length) { await enviar(chatId, '😔 Sin filas con "' + esc(filtro.join(' ')) + '" en ' + esc(h[1]) + ' (' + t.filas.length + ' filas en total).'); return; }
-  const lim = esWeb(chatId) ? 50 : Math.min(MAX_RES, 12);
+  const lim = pg.todo ? (esWeb(chatId) ? 400 : 60) : (esWeb(chatId) ? 50 : 12);
+  const ini = (pg.pag - 1) * lim;
   let tg = '📄 <b>' + esc(h[1]) + '</b> · ' + res.length + ' fila(s)' + (filtro.length ? ' de ' + t.filas.length : '') + '\n';
   const cnt = conteosColumnas_(t.enc, res);
   if (cnt) tg += '📊 <i>' + esc(cnt) + '</i>\n';
   tg += '━━━━━━━━━━━━━━━━━\n\n';
-  res.slice(0, lim).forEach(function (r, i) { tg += (i + 1) + '. ' + esc(filaTexto_(t.enc, r, 10)) + '\n\n'; });
-  if (res.length > lim) tg += '...y ' + (res.length - lim) + ' más. Agrega palabras al filtro para acotar.';
+  res.slice(ini, ini + lim).forEach(function (r, i) { tg += (ini + i + 1) + '. ' + esc(filaTexto_(t.enc, r, 12)) + '\n\n'; });
+  if (ini >= res.length) tg += 'No hay página ' + pg.pag + ' (son ' + Math.ceil(res.length / lim) + ').';
+  else if (ini + lim < res.length) tg += '...mostrando ' + (ini + 1) + '–' + (ini + lim) + ' de ' + res.length + '. Agrega <code>pag ' + (pg.pag + 1) + '</code> para seguir o <code>todo</code> para verlas todas.';
   await enviar(chatId, tg);
 }
 
@@ -1741,51 +1811,142 @@ function esPregunta_(texto) {
     /^(cuantos|cuantas|cuanto|cual|cuales|que|quien|quienes|como|donde|cuando|por que|dime|dame|muestrame|listame|lista|hay|tengo|tenemos|en que|a que)\b/.test(t);
 }
 
-// Devuelve true si respondió. Elige pestaña(s) por las palabras de la pregunta,
-// trae los datos REALES y le pide a la IA que conteste solo con ellos.
-async function preguntarHojas(chatId, pregunta, env) {
+// ============================================================
+// RAZONAMIENTO SOBRE LAS DOS HOJAS (v8.6) · control total
+// ============================================================
+// preguntarHojas: 1) un "enrutador" de IA elige las pestañas y el filtro
+// (si falla, se eligen por palabras clave), 2) el CÓDIGO calcula conteos,
+// sumas, promedios, mínimos y máximos exactos, 3) una IA grande razona y
+// responde SOLO con esos datos. Si la IA grande falla, usa la chica.
+// Nada se guarda: cada pregunta lee las hojas en vivo.
+
+const CF_AI_MODEL_GRANDE = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
+
+async function aiCorrer_(env, mensajes, maxTokens) {
+  try {
+    const r = await env.AI.run(CF_AI_MODEL_GRANDE, { messages: mensajes, max_tokens: maxTokens });
+    const t = String((r && r.response) || '').trim();
+    if (t) return t;
+  } catch (e) { console.error('IA grande: ' + e.message); }
+  const r2 = await env.AI.run(CF_AI_MODEL, { messages: mensajes, max_tokens: maxTokens });
+  return String((r2 && r2.response) || '').trim();
+}
+
+function parsePag_(norm) {
+  let pag = 1, todo = false, r = String(norm || '');
+  const m = r.match(/\bpag(?:ina)?\s*(\d+)\b/);
+  if (m) { pag = Math.max(1, parseInt(m[1], 10)); r = r.replace(m[0], ' '); }
+  if (/\b(todo|todos|todas|completo|completa)\b/.test(r)) { todo = true; r = r.replace(/\b(todo|todos|todas|completo|completa)\b/g, ' '); }
+  return { pag: pag, todo: todo, resto: r.replace(/\s+/g, ' ').trim() };
+}
+function colLetra_(i) {
+  let s = ''; i = i + 1;
+  while (i > 0) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); }
+  return s;
+}
+function redond_(x) { return Math.abs(x) >= 100 ? Math.round(x) : Math.round(x * 100) / 100; }
+
+// Estadísticas numéricas exactas de las columnas que parecen montos o cantidades.
+function estadisticasNum_(h, filas) {
+  const out = [];
+  for (let c = 0; c < h.length && out.length < 6; c++) {
+    const nombre = String(h[c] || '').trim();
+    if (!nombre || /\b(sku|id|upc|gtin|pedido|orden|folio|numero|referencia|documento|telefono|clave|item|curp)\b/.test(normEnc(nombre))) continue;
+    let n = 0, nv = 0, suma = 0, mn = Infinity, mx = -Infinity;
+    for (let i = 0; i < filas.length; i++) {
+      const v = String(filas[i][c] == null ? '' : filas[i][c]).trim();
+      if (!v) continue;
+      nv++;
+      if (!/^[-$]?\s*[\d,]+(\.\d+)?\s*%?$/.test(v)) continue;
+      const x = parseFloat(v.replace(/[$,%\s]/g, ''));
+      if (isNaN(x)) continue;
+      n++; suma += x; if (x < mn) mn = x; if (x > mx) mx = x;
+    }
+    if (n < 2 || n < nv * 0.7) continue;
+    out.push(nombre + ': suma ' + redond_(suma) + ' · prom ' + redond_(suma / n) + ' · min ' + mn + ' · max ' + mx + ' (n=' + n + ')');
+  }
+  return out.join('\n');
+}
+
+// Enrutador: la IA elige 1-3 pestañas y palabras de filtro.
+async function planificarTabs_(pregunta, env) {
+  if (!env || !env.AI) return null;
+  const lista = CAT_.map(function (h, i) {
+    return (i + 1) + '. ' + LIBROS_BOT[h[0]].nombre + ' > ' + h[1] + ' - ' + String(h[2]).split(' ').slice(0, 9).join(' ');
+  }).join('\n');
+  try {
+    const t = await aiCorrer_(env, [
+      { role: 'system', content:
+        'Eres el enrutador de un bot de datos de Electronics Mexico. Dada una pregunta y una lista numerada de pestañas, ' +
+        'responde SOLO un JSON: {"tabs":[1 a 3 numeros de pestaña necesarias],"filtro":["palabras que deben aparecer en las filas"]}. ' +
+        'Usa filtro vacio [] si la pregunta es sobre toda la pestaña (conteos, totales). Sin texto extra.' },
+      { role: 'user', content: 'Pregunta: ' + pregunta + '\n\nPestañas:\n' + lista }
+    ], 150);
+    const m = t.match(/\{[\s\S]*\}/);
+    if (!m) return null;
+    const j = JSON.parse(m[0]);
+    const tabs = (j.tabs || []).map(function (n) { return CAT_[parseInt(n, 10) - 1]; }).filter(Boolean).slice(0, 3);
+    if (!tabs.length) return null;
+    return { tabs: tabs, filtro: (j.filtro || []).map(function (x) { return normEnc(String(x)); }).filter(function (x) { return x.length >= 2; }).slice(0, 5) };
+  } catch (e) { console.error('plan: ' + e.message); return null; }
+}
+
+// Devuelve true si respondió.
+async function preguntarHojas(chatId, pregunta, env, usarPlan) {
   await refrescarCatalogo_();
-  const tabs = mejoresTabs_(pregunta, 2);
-  if (!tabs.length) return false;
   const pal = palabrasClave_(pregunta);
+  let tabs = [], filtroLLM = null;
+  if (usarPlan !== false) {
+    const plan = await planificarTabs_(pregunta, env);
+    if (plan) { tabs = plan.tabs; filtroLLM = plan.filtro; }
+  }
+  if (!tabs.length) tabs = mejoresTabs_(pregunta, 3);
+  if (!tabs.length) return false;
+
   const lecturas = await Promise.all(tabs.map(function (h) { return cargarTab_(h[0], h[1]).catch(function () { return null; }); }));
   const ok = lecturas.map(function (t, i) { return t ? { h: tabs[i], t: t } : null; }).filter(Boolean);
-  if (!ok.length) { await enviar(chatId, '❌ Sin acceso a ' + esc(tabs.map(function (h) { return h[1]; }).join(' / ')) + '.'); return true; }
+  if (!ok.length) {
+    await enviar(chatId, '❌ Sin acceso a ' + esc(tabs.map(function (h) { return h[1]; }).join(' / ')) +
+      (tabs.some(function (h) { return h[0] === 'SITE'; }) ? '\n<i>Sheet Site tiene que estar compartido (cualquier persona con el enlace · lector) o con la cuenta de servicio.</i>' : ''));
+    return true;
+  }
 
   let contexto = '', fuentes = [];
   ok.forEach(function (x) {
     const claves = normEnc(x.h[1] + ' ' + x.h[2]).split(' ');
-    const filtro = pal.filter(function (w) { const r = raiz_(w); return !claves.some(function (c) { return c === w || (r.length >= 4 && c.indexOf(r) === 0); }); });
+    const filtro = filtroLLM !== null ? filtroLLM
+      : pal.filter(function (w) { const r = raiz_(w); return !claves.some(function (c) { return c === w || (r.length >= 4 && c.indexOf(r) === 0); }); });
     let sel = filtro.length ? x.t.filas.filter(function (r) { return coincideFila_(r, filtro); }) : x.t.filas;
     let nota = filtro.length ? 'filas que contienen "' + filtro.join(' ') + '"' : 'todas las filas';
-    if (filtro.length && !sel.length) { sel = x.t.filas; nota = 'SIN coincidencias con "' + filtro.join(' ') + '"; se muestran filas generales'; }
+    if (filtro.length && !sel.length) { sel = x.t.filas; nota = 'SIN coincidencias con "' + filtro.join(' ') + '"; se usan todas las filas'; }
     const cnt = conteosColumnas_(x.t.enc, sel);
+    const est = estadisticasNum_(x.t.enc, sel);
     contexto += '### ' + LIBROS_BOT[x.h[0]].nombre + ' › ' + x.h[1] + '\n' +
+      'Columnas: ' + x.t.enc.map(function (c) { return String(c || '').trim(); }).filter(Boolean).join(' | ') + '\n' +
       'Filas en la pestaña: ' + x.t.filas.length + ' · Filas seleccionadas: ' + sel.length + ' (' + nota + ')\n' +
-      (cnt ? 'Conteos de las seleccionadas -> ' + cnt + '\n' : '') +
-      'Primeras filas:\n' + sel.slice(0, 25).map(function (r, i) { return (i + 1) + ') ' + filaTexto_(x.t.enc, r, 12); }).join('\n') + '\n\n';
+      (cnt ? 'Conteos EXACTOS de las seleccionadas -> ' + cnt + '\n' : '') +
+      (est ? 'Estadísticas EXACTAS de las seleccionadas:\n' + est + '\n' : '') +
+      'Filas (' + Math.min(40, sel.length) + ' de ' + sel.length + '):\n' +
+      sel.slice(0, 40).map(function (r, i) { return (i + 1) + ') ' + filaTexto_(x.t.enc, r, 14); }).join('\n') + '\n\n';
     fuentes.push(x.h[1] + ' (' + x.t.filas.length + ' filas)');
   });
-  if (contexto.length > 7000) contexto = contexto.slice(0, 7000) + '\n[…recortado]';
+  if (contexto.length > 14000) contexto = contexto.slice(0, 14000) + '\n[…recortado]';
 
-  const pie = '\n\n<i>Fuente: ' + esc(fuentes.join(' + ')) + '</i>';
+  const pie = '\n\n<i>Fuente: ' + esc(fuentes.join(' + ')) + ' · en vivo</i>';
   if (!env || !env.AI) {
-    await enviar(chatId, '📄 Estas son las pestañas que corresponden (sin IA disponible): ' + esc(fuentes.join(', ')) + '. Usa <code>hoja ' + esc(tabs[0][1].toLowerCase()) + '</code> para ver filas.');
+    await enviar(chatId, '📄 Pestañas que corresponden (sin IA disponible): ' + esc(fuentes.join(', ')) + '. Usa <code>hoja ' + esc(tabs[0][1].toLowerCase()) + '</code> para ver filas.');
     return true;
   }
   try {
     await enviar(chatId, '🔎 Revisando ' + esc(fuentes.join(' + ')) + '...');
-    const r = await env.AI.run(CF_AI_MODEL, {
-      messages: [
-        { role: 'system', content:
-          'Eres analista de datos de Electronics México. Responde en español, corto y directo, SOLO con los datos que te doy. ' +
-          'Si los datos no alcanzan para responder, dilo y sugiere el comando "hoja <pestaña> <filtro>". ' +
-          'Usa los conteos exactos cuando existan; no inventes cifras ni SKUs; si solo ves las primeras filas, aclara que es una muestra.' },
-        { role: 'user', content: 'Pregunta: ' + pregunta + '\n\nDatos:\n' + contexto }
-      ],
-      max_tokens: 500
-    });
-    const txt = String((r && r.response) || '').trim();
+    const txt = await aiCorrer_(env, [
+      { role: 'system', content:
+        'Eres el analista de datos de Electronics México (Sheet Site y Venta Diaria). Responde en español de México, directo y claro. ' +
+        'Razona con los datos que te doy: usa los conteos y estadísticas EXACTOS cuando existan, compara, ordena y cruza pestañas si hace falta. ' +
+        'No inventes cifras, SKUs ni fechas. Si solo ves una muestra de filas, dilo. Si los datos no alcanzan, dilo y sugiere "hoja <pestaña> <filtro>". ' +
+        'Si piden un listado, dalo en lista corta; si piden un número, empieza con el número.' },
+      { role: 'user', content: 'Pregunta: ' + pregunta + '\n\nDatos:\n' + contexto }
+    ], 900);
     if (!txt) return false;
     await enviar(chatId, '🤖 ' + esc(txt) + pie);
     return true;
@@ -1794,6 +1955,290 @@ async function preguntarHojas(chatId, pregunta, env) {
     await enviar(chatId, '😔 No pude armar la respuesta. Usa <code>hoja ' + esc(tabs[0][1].toLowerCase()) + ' &lt;filtro&gt;</code>.');
     return true;
   }
+}
+
+// Encuentra UNA pestaña por nombre (o por palabras clave). { h } | { amb } | { error }
+function resolverTab_(norm) {
+  let libro = null, n = String(norm || '');
+  if (/\b(vd|venta diaria|ventadiaria)\b/.test(n)) { libro = 'VD'; n = n.replace(/\b(vd|venta diaria|ventadiaria)\b/, ' '); }
+  else if (/\b(site|sheet site)\b/.test(n)) { libro = 'SITE'; n = n.replace(/\b(sheet site|site)\b/, ' '); }
+  n = n.replace(/\s+/g, ' ').trim();
+  if (!n) return { error: 'Falta el nombre de la pestaña.' };
+  let cand = CAT_.filter(function (h) { return n.indexOf(normEnc(h[1])) !== -1; });
+  if (libro) cand = cand.filter(function (h) { return h[0] === libro; });
+  if (!cand.length) {
+    cand = mejoresTabs_(n, 1);
+    if (libro) cand = cand.filter(function (h) { return h[0] === libro; });
+  }
+  if (!cand.length) return { error: 'No encontré esa pestaña. Escribe hojas para ver la lista.' };
+  const largo = Math.max.apply(null, cand.map(function (h) { return h[1].length; }));
+  cand = cand.filter(function (h) { return h[1].length === largo; });
+  if (cand.length > 1) return { amb: cand };
+  return { h: cand[0] };
+}
+
+// columnas <pestaña>: encabezados con su letra, cuántas filas traen datos y un ejemplo.
+async function cmdColumnas_(chatId, consulta) {
+  await refrescarCatalogo_();
+  const r = resolverTab_(normEnc(consulta));
+  if (r.error) { await enviar(chatId, '😔 ' + esc(r.error)); return; }
+  if (r.amb) {
+    await enviar(chatId, '🤔 Hay más de una: ' + r.amb.map(function (h) { return '<code>columnas ' + (h[0] === 'SITE' ? 'site' : 'vd') + ' ' + esc(h[1].toLowerCase()) + '</code>'; }).join(' · '));
+    return;
+  }
+  const h = r.h;
+  const t = await cargarTab_(h[0], h[1]);
+  if (!t) { await enviar(chatId, '❌ Sin acceso a <b>' + esc(h[1]) + '</b> (' + LIBROS_BOT[h[0]].nombre + ').'); return; }
+  let tg = '📋 <b>' + esc(h[1]) + '</b> · ' + LIBROS_BOT[h[0]].nombre + ' · ' + t.filas.length + ' filas · ' + t.enc.length + ' columnas\n━━━━━━━━━━━━━━━━━\n';
+  t.enc.forEach(function (c, i) {
+    const nombre = String(c || '').trim();
+    if (!nombre) return;
+    let llenas = 0, ejemplo = '';
+    for (let k = 0; k < t.filas.length; k++) {
+      const v = String(t.filas[k][i] == null ? '' : t.filas[k][i]).trim();
+      if (v) { llenas++; if (!ejemplo) ejemplo = v.length > 36 ? v.slice(0, 36) + '…' : v; }
+    }
+    tg += colLetra_(i) + ') <b>' + esc(nombre) + '</b> · ' + llenas + '/' + t.filas.length + (ejemplo ? ' · ej: ' + esc(ejemplo) : '') + '\n';
+  });
+  await enviar(chatId, tg);
+}
+
+// ============================================================
+// COMANDOS DIRECTOS POR PESTAÑA (todo lo nuevo de los dos libros)
+// ============================================================
+// Cada comando lee su pestaña EN VIVO por encabezado, cuenta por estado,
+// filtra con las palabras que escribas y muestra las filas más importantes.
+//   cancelaciones [filtro]      · republicar · ventas 30 dias · traslados
+//   cobro distinto [detalle]    · casos walmart · comparar walmart
+//   killers bajo minimo / sin minimo / fuera · estado killers · historico killers
+//   wfs · envio [n] · historico envios · autorizaciones · restricciones
+//   parrilla <departamento> · oportunidades · edi · variantes · cambio walmart
+//   promociones · comisiones · catalogo cva · catalogo · bloqueados · publicaciones
+//   precio libre · precios variaciones · sku asignados · categoria revisar · salud
+//   inventario actual · inventario negativo
+// col. de cada 'cols' = alias del encabezado; si no existe se omite (no rompe).
+
+const SUBCMD_ = [
+  { re: /^log\s+ventas\b/, libro: 'VD', tab: 'LOG Ventas', icono: '🧾', titulo: 'Log de Venta Diaria',
+    resumen: ['NIVEL', 'ETAPA'], cols: ['Hora', 'Nivel', 'Etapa', 'Mensaje'], orden: 'Hora' },
+  { re: /^log\b/, libro: 'SITE', tab: 'Log', icono: '🧾', titulo: 'Log de Sheet Site',
+    resumen: ['NIVEL', 'ETAPA'], cols: ['Hora', 'Nivel', 'Etapa', 'Mensaje'], orden: 'Hora' },
+  { re: /^kams?\s+departamentos?\b/, libro: 'SITE', tab: 'KAMS Departamentos', icono: '🧭', titulo: 'KAMS · departamentos', resumen: ['GRUPO KAM'], cols: null },
+  { re: /^kams?\b/, libro: 'SITE', tab: 'KAMS', icono: '👥', titulo: 'KAMs', resumen: ['CONFIRMADO'], cols: null },
+  { re: /^correos?\b/, libro: 'SITE', tab: 'Correo', icono: '✉️', titulo: 'Plantilla de correo', resumen: [], cols: null },
+  { re: /^envios?\s+killers?\b/, libro: 'SITE', tab: 'Envios killers', icono: '📤', titulo: 'Envíos de killers a KAMs',
+    resumen: ['ESTADO', 'MODO', 'GRUPO KAM'], cols: ['FECHA', 'MODO', 'GRUPO KAM', 'PARA', 'KILLERS', 'ESTADO'], orden: 'FECHA' },
+  { re: /^historico\s+choferes\b/, libro: 'SITE', tab: 'HISTORICO CHOFERES', icono: '🧑‍✈️', titulo: 'Histórico de choferes', resumen: [], cols: null },
+  { re: /^choferes\b/, libro: 'SITE', tab: 'CATALOGO CHOFERES', icono: '🧑‍✈️', titulo: 'Catálogo de choferes', resumen: [], cols: null },
+  { re: /^historico\s+camionetas\b/, libro: 'SITE', tab: 'HISTORICO CAMIONETAS', icono: '🚐', titulo: 'Histórico de camionetas', resumen: [], cols: null },
+  { re: /^camionetas?\b/, libro: 'SITE', tab: 'CATALOGO CAMIONETAS', icono: '🚐', titulo: 'Catálogo de camionetas', resumen: [], cols: null },
+  { re: /^indice\s+(?:vd|venta\s+diaria)\b/, libro: 'VD', tab: '📑 Índice', icono: '📑', titulo: 'Índice · Venta Diaria', resumen: [], cols: null },
+  { re: /^indice\b/, libro: 'SITE', tab: '📑 Índice', icono: '📑', titulo: 'Índice · Sheet Site', resumen: [], cols: null },
+  { re: /^guia\s+(?:vd|venta\s+diaria)\b/, libro: 'VD', tab: '📖 Guía del menú', icono: '📖', titulo: 'Guía del menú · Venta Diaria', resumen: ['NIVEL', 'SECCION DEL MENU'], cols: null },
+  { re: /^guia\b/, libro: 'SITE', tab: '📖 Guía del menú', icono: '📖', titulo: 'Guía del menú · Sheet Site', resumen: ['NIVEL', 'SECCION DEL MENU'], cols: null },
+  { re: /^marcas\b/, libro: 'SITE', tab: '_Marcas', icono: '🏷️', titulo: 'Marcas (prefijos)', resumen: [], cols: null },
+  { re: /^colores\b/, libro: 'SITE', tab: '_Colores', icono: '🎨', titulo: 'Colores (códigos)', resumen: [], cols: null },
+  { re: /^cancelaciones?\b/, libro: 'SITE', tab: 'Cancelaciones', icono: '🚫', titulo: 'Cancelaciones',
+    resumen: ['ORIGEN', 'ESTADO ODOO', 'CANCELAR EN ODOO'],
+    cols: ['Pedido#', 'Orden de compra#', 'SKU COMPLETO', 'Qty.', 'ORIGEN', 'ESTADO ODOO', 'CANCELAR EN ODOO', 'FECHA CORREO', 'NOTA ODOO'],
+    orden: 'FECHA CORREO' },
+  { re: /^(republicar|republicados?|republicacion(?:es)?)\b/, libro: 'SITE', tab: 'Republicar', icono: '♻️', titulo: 'Republicar',
+    resumen: ['ESTADO', 'MOTIVO', 'ORIGEN', 'ESTATUS NUEVO'],
+    cols: ['SKU VIEJO', 'SKU NUEVO', 'ESTADO', 'DIAS AHI', 'MOTIVO', 'ESTATUS NUEVO', 'FECHA ENTRADA', 'FECHA REPUBLICADO'] },
+  { re: /^ventas?\s*(?:de\s+)?30(?:\s*dias?)?\b/, libro: 'SITE', tab: 'Ventas 30 dias', icono: '📈', titulo: 'Ventas 30 días',
+    resumen: [], cols: ['SKU', 'PRODUCTO', 'PIEZAS', 'DESDE', 'HASTA'], orden: 'PIEZAS' },
+  { re: /^traslados?\b/, libro: 'SITE', tab: 'Traslados Odoo', icono: '🚛', titulo: 'Traslados Odoo',
+    resumen: ['ESTADO', 'ESTATUS', 'TIPO DE OPERACION', 'ORIGEN', 'DESTINO'], cols: null },
+  { re: /^cobros?\s+distintos?\s+detalle\b/, libro: 'SITE', tab: 'Cobro distinto detalle', icono: '💸', titulo: 'Cobro distinto · detalle',
+    resumen: ['KILLER'], cols: ['SKU', 'PEDIDO', 'CORTE', 'COBRADO', 'DEBIDO', 'DIF', 'COM', 'ENVIO', 'VENTA'], orden: 'DIF' },
+  { re: /^cobros?\s+distintos?\b/, libro: 'SITE', tab: 'Cobro distinto', icono: '💸', titulo: 'Cobro distinto',
+    resumen: ['CAUSA', 'PUB'], cols: ['BASE', 'PEDIDOS', 'PESOS', 'CAT COBRA', 'CAT DEBIDA', 'COBRADO', 'DEBIDO', 'PUB', 'CAUSA'], orden: 'PESOS' },
+  { re: /^casos?(?:\s+walmart)?\b/, libro: 'VD', tab: 'CASOS WALMART', icono: '📂', titulo: 'Casos con Walmart',
+    resumen: ['ESTADO', 'TIPO', 'CORREO ENVIADO', 'DETECTADO'],
+    cols: ['FOLIO WALMART', 'FECHA ABIERTO', 'SKU', 'TIPO', 'ESTADO', 'CORREO ENVIADO', 'SEGUIMIENTO', 'RESOLUCION', 'FECHA CIERRE'], orden: 'FECHA ABIERTO' },
+  { re: /^comparar(?:\s+walmart)?\b/, libro: 'VD', tab: 'COMPARAR WALMART', icono: '⚖️', titulo: 'Comparar killers vs Walmart',
+    resumen: ['DECISION', 'PROBLEMA', 'TIPO', 'ESTADO EN WALMART'],
+    cols: ['SKU', 'TIPO', 'DECISION', '% VS MINIMO', 'MINIMO APLICABLE', 'PRECIO EN WALMART', 'ESTADO EN WALMART', 'STOCK WALMART', 'PROBLEMA', 'ACCION SUGERIDA'] },
+  { re: /^killers?\s+bajo\s+minimo\b/, libro: 'VD', tab: 'KILLERS BAJO MINIMO', icono: '📉', titulo: 'Killers bajo mínimo',
+    resumen: ['CATEGORIA KAM', 'DEPARTAMENTO WALMART'],
+    cols: ['SKU WALMART', 'PRODUCTO', 'PRECIO KILLER', 'MINIMO', 'FALTA', '% PERDIDA', 'TERMINA', 'CATEGORIA KAM', 'ACCION SUGERIDA'], orden: 'FALTA' },
+  { re: /^killers?\s+sin\s+minimo\b/, libro: 'SITE', tab: 'Killers sin minimo', icono: '❔', titulo: 'Killers sin mínimo',
+    resumen: ['KAM MINIMO', 'KAM FALTA'],
+    cols: ['SKU', 'TITULO', 'ACTUAL', 'CUPON', 'RECIBIMOS', 'KAM FALTA', 'KAM MINIMO', 'DIAS RESTANTES', 'FIN'] },
+  { re: /^killers?\s+fuera\b/, libro: 'VD', tab: 'KILLERS FUERA', icono: '🚪', titulo: 'Killers fuera',
+    resumen: ['MOTIVO', 'KAM'], cols: ['SKU', 'KAM', 'PRODUCTO', 'MINIMO', 'PRECIO KILLER', '% PERDIDA', 'MOTIVO'] },
+  { re: /^estado\s+killers?\b/, libro: 'SITE', tab: 'Estado Killers', icono: '🔪', titulo: 'Estado de killers',
+    resumen: ['ESTADO', 'DECISION', 'KAM', 'ESTATUS'], cols: null },
+  { re: /^historico\s+killers?\b/, libro: 'VD', tab: 'KILLERS HISTORICO', icono: '🗂️', titulo: 'Historial de killers',
+    resumen: ['CARGA', 'ORIGEN'], cols: ['CARGA', 'SKU', 'DETALLES', 'PRECIO NEGOCIADO', 'CUPON', 'RECIBIMOS', 'INICIO', 'FIN'], orden: 'REGISTRADO' },
+  { re: /^(?:sku\s+)?enviados?\s+killers?\b|^sku\s+enviados?\b/, libro: 'SITE', tab: 'SKU enviados killers', icono: '📨', titulo: 'SKU enviados en killers',
+    resumen: [], cols: null },
+  { re: /^historico\s+envios?\b/, libro: 'SITE', tab: 'HISTORICO ENVIOS', icono: '🚚', titulo: 'Histórico de envíos WFS',
+    resumen: [], cols: null },
+  { re: /^autorizaciones?(?:\s+wfs)?\b/, libro: 'SITE', tab: 'Autorizaciones WFS', icono: '✅', titulo: 'Autorizaciones WFS',
+    resumen: [], cols: null },
+  { re: /^restricciones?(?:\s+wfs)?\b/, libro: 'SITE', tab: 'Restricciones WFS', icono: '⛔', titulo: 'Restricciones WFS',
+    resumen: [], cols: null },
+  { re: /^wfs\b/, libro: 'SITE', tab: 'WFS', icono: '🚚', titulo: 'WFS (envío en preparación)',
+    resumen: ['ESTATUS', 'ESTADO', 'TIPO'], cols: null },
+  { re: /^salud\b/, libro: 'SITE', tab: 'Salud', icono: '🩺', titulo: 'Salud del libro',
+    resumen: ['ESTADO', 'NIVEL'], cols: null },
+  { re: /^oportunidades?\b/, libro: 'SITE', tab: 'Oportunidades', icono: '💡', titulo: 'Oportunidades',
+    resumen: ['SITUACION', 'ACCION'],
+    cols: ['FAMILIA (ODOO)', 'NOMBRE', 'STOCK ODOO', 'PRECIO', 'VALOR PARADO', 'SITUACION', 'PUBLICACIONES', 'VIVAS', 'CAIDAS', 'ACCION'], orden: 'VALOR PARADO' },
+  { re: /^(?:cruce\s+)?edi\b/, libro: 'SITE', tab: 'Cruce EDI', icono: '🔗', titulo: 'Cruce EDI',
+    resumen: ['DIAGNOSTICO', 'ACCION SUGERIDA', 'DECISION', 'ESTATUS'],
+    cols: ['SKU WALMART', 'PRODUCTO', 'ESTATUS', 'STOCK ODOO', 'STOCK WALMART', 'PRECIO WALMART', 'DIAGNOSTICO', 'ACCION SUGERIDA', 'DECISION'] },
+  { re: /^variantes?\b/, libro: 'SITE', tab: 'Variantes', icono: '🧬', titulo: 'Variantes',
+    resumen: ['ALERTA', 'ROL', 'CANAL', 'ESTATUS'],
+    cols: ['SKU WALMART', 'FAMILIA (ODOO)', 'CANAL', 'ROL', 'ESTATUS', 'PRECIO HOY', 'PRECIO PRINCIPAL', 'DISPONIBLE ODOO', 'ALERTA'] },
+  { re: /^cambio\s+walmart\b/, libro: 'SITE', tab: 'Cambio Walmart', icono: '🔁', titulo: 'Cambio de precio Walmart',
+    resumen: ['CANAL'], cols: ['SKU WALMART', 'PRODUCTO', 'CANAL', 'PRECIO SITE', 'FACTOR', 'PRECIO FINAL', 'TACHADO', 'INICIO (MX)', 'FIN (MX)'] },
+  { re: /^promociones?\b/, libro: 'SITE', tab: 'Promociones', icono: '🎁', titulo: 'Promociones',
+    resumen: ['ESTADO', 'APLICA', 'GRUPO NOMBRE'],
+    cols: ['SKU', 'PRODUCTO', 'CATEGORIA', 'APLICA', 'COMISION NORMAL', 'PUNTOS DE DESCUENTO', 'COMISION CON PROMO', 'AVISO', 'ESTADO', 'INI', 'FIN'] },
+  { re: /^comisiones?\b/, libro: 'SITE', tab: 'Comisiones', icono: '💰', titulo: 'Comisiones',
+    resumen: [], cols: ['CATEGORIA WALMART', 'COMISION NORMAL', 'LA PROMO APLICA A', 'ACTUALIZADO'] },
+  { re: /^(?:catalogo\s+cva|cva\s+catalogo)\b/, libro: 'SITE', tab: 'CVA Catalogo', icono: '🏷️', titulo: 'Catálogo CVA',
+    resumen: ['GRUPO'], cols: ['CLAVE CVA', 'DESCRIPCION', 'MARCA', 'GRUPO', 'PRECIO CVA', 'STOCK TOTAL', 'EN TRANSITO', 'PRECIO PROMO', 'ACTUALIZADO CVA'] },
+  { re: /^catalogo\b/, libro: 'SITE', tab: 'Catalogo', icono: '📚', titulo: 'Catálogo',
+    resumen: ['CATEGORIA'], cols: ['SKU', 'REFERENCIA', 'NOMBRE', 'CATEGORIA'] },
+  { re: /^(?:walmart\s+)?bloqueados?\b/, libro: 'SITE', tab: 'Bloqueados', icono: '🔒', titulo: 'Bloqueados en Walmart',
+    resumen: ['DEPARTAMENTO', 'ESTATUS'], cols: ['SKU', 'DEPARTAMENTO', 'PRECIO', 'ESTATUS', 'NOMBRE', 'CATEGORIA'] },
+  { re: /^publicaciones\b/, libro: 'SITE', tab: 'Walmart', icono: '🛒', titulo: 'Publicaciones de Walmart',
+    resumen: ['ESTATUS', 'DEPARTAMENTO', 'ES WFS'], cols: ['SKU', 'DEPARTAMENTO', 'PRECIO', 'ESTATUS', 'WFS', 'INV NORMAL', 'NOMBRE'] },
+  { re: /^precio\s+libre\b/, libro: 'VD', tab: 'PRECIO LIBRE', icono: '🆓', titulo: 'Precio libre',
+    resumen: [], cols: ['SKU', 'MOTIVO', 'HASTA (OPCIONAL)'] },
+  { re: /^precios?\s+variaciones?\b/, libro: 'VD', tab: 'PRECIOS VARIACIONES', icono: '↕️', titulo: 'Precios variaciones',
+    resumen: [], cols: null },
+  { re: /^sku\s+asignados?\b/, libro: 'VD', tab: 'SKU ASIGNADOS', icono: '🧷', titulo: 'SKU asignados',
+    resumen: [], cols: null },
+  { re: /^categoria\s+revisar\b/, libro: 'VD', tab: 'CATEGORIA REVISAR', icono: '🧐', titulo: 'Categoría por revisar',
+    resumen: ['ESTADO', 'KAM'], cols: null },
+  { re: /^inventario\s+actual\b/, libro: 'SITE', tab: 'Inventario Actual', icono: '📦', titulo: 'Inventario actual (Odoo)',
+    resumen: [], cols: ['SKU', 'PRODUCTO', 'LIBRE', 'EXISTENCIA', 'RESERVADO', 'EN TRANSITO'] },
+  { re: /^inventario\s+negativo\b/, libro: 'SITE', tab: 'Inventario Negativo', icono: '➖', titulo: 'Inventario negativo',
+    resumen: ['ALMACEN'], cols: ['SKU', 'PRODUCTO', 'CANTIDAD', 'SERIE', 'UBICACION', 'ALMACEN'] }
+];
+
+const PARRILLAS_ = ['AUDIO', 'AUTOMOTRIZ', 'BELLEZA', 'COMPUTACION', 'ELECTRODOMESTICOS', 'FERRETERIA', 'FOTOGRAFIA', 'JUGUETERIA', 'TV', 'VIDEOJUEGOS'];
+
+function ordenValor_(v) {
+  const t = String(v == null ? '' : v).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(t) || /^\d{1,2}\/\d{1,2}\/\d{2,4}/.test(t)) return { s: t };
+  const n = parseFloat(t.replace(/[$,%\s]/g, ''));
+  return isNaN(n) ? { s: t } : { n: n };
+}
+function conteoCol_(h, filas, alias) {
+  const i = colPor(h, alias);
+  if (i < 0) return '';
+  const cuenta = {};
+  let n = 0;
+  filas.forEach(function (r) {
+    const v = String(r[i] == null ? '' : r[i]).trim();
+    if (!v) return;
+    const k = v.length > 28 ? v.slice(0, 28) + '…' : v;
+    cuenta[k] = (cuenta[k] || 0) + 1; n++;
+  });
+  const claves = Object.keys(cuenta);
+  if (!claves.length || claves.length > 14) return '';
+  claves.sort(function (a, b) { return cuenta[b] - cuenta[a]; });
+  return String(h[i]).trim() + ': ' + claves.slice(0, 8).map(function (k) { return k + ' ' + cuenta[k]; }).join(' · ');
+}
+function filaCols_(h, r, idxs, max) {
+  const partes = [];
+  idxs.forEach(function (i) {
+    if (partes.length >= (max || 9)) return;
+    const v = String(r[i] == null ? '' : r[i]).trim();
+    if (!v) return;
+    partes.push(String(h[i]).trim() + ': ' + (v.length > 42 ? v.slice(0, 42) + '…' : v));
+  });
+  return partes.join(' · ');
+}
+
+// def: { libro, tab, icono, titulo, resumen[], cols[]|null, orden }  ·  textoNorm: lo que escribió el usuario
+async function cmdTabla_(chatId, def, textoNorm) {
+  const pg = parsePag_(def.re ? textoNorm.replace(def.re, ' ') : textoNorm);
+  const resto = pg.resto;
+  const filtro = palabrasClave_(resto);
+  await enviar(chatId, def.icono + ' <b>' + esc(def.titulo) + '</b>' + (filtro.length ? ' · filtro: ' + esc(filtro.join(' ')) : '') + '...');
+  const t = await cargarTab_(def.libro, def.tab);
+  if (!t) {
+    await enviar(chatId, '❌ Sin acceso a <b>' + esc(def.tab) + '</b> (' + LIBROS_BOT[def.libro].nombre + ').' +
+      (def.libro === 'SITE' ? '\n<i>Sheet Site tiene que estar compartido (cualquier persona con el enlace · lector) o con la cuenta de servicio.</i>' : ''));
+    return;
+  }
+  const h = t.enc;
+  let filas = t.filas;
+  const total = filas.length;
+  if (filtro.length) filas = filas.filter(function (r) { return coincideFila_(r, filtro); });
+  if (!filas.length) {
+    await enviar(chatId, '😔 Sin filas' + (filtro.length ? ' con "' + esc(filtro.join(' ')) + '"' : '') + ' en ' + esc(def.tab) + ' (' + total + ' en total).');
+    return;
+  }
+  if (def.orden) {
+    const io = colPor(h, def.orden);
+    if (io >= 0) {
+      filas = filas.slice().sort(function (a, b) {
+        const x = ordenValor_(a[io]), y = ordenValor_(b[io]);
+        if (x.n !== undefined && y.n !== undefined) return y.n - x.n;
+        return String(y.s !== undefined ? y.s : '').localeCompare(String(x.s !== undefined ? x.s : ''));
+      });
+    }
+  }
+  let idxs = (def.cols || []).map(function (a) { return colPor(h, a); }).filter(function (i) { return i >= 0; });
+  if (!idxs.length) {
+    idxs = [];
+    for (let i = 0; i < h.length && idxs.length < 9; i++) if (String(h[i] || '').trim()) idxs.push(i);
+  }
+  let tg = def.icono + ' <b>' + esc(def.titulo) + '</b> · ' + filas.length + ' fila(s)' + (filtro.length ? ' de ' + total : '') + '\n';
+  const ia = colPor(h, ['ACTUALIZADO']) >= 0 ? colPor(h, ['ACTUALIZADO']) : colPor(h, ['ACTUALIZADO CVA']);
+  if (ia >= 0) {
+    let ult = '';
+    t.filas.slice(0, 300).forEach(function (r) { const v = String(r[ia] || '').trim(); if (v > ult) ult = v; });
+    if (ult) tg += '🕒 <i>hoja al ' + esc(ult) + '</i>\n';
+  }
+  const res = (def.resumen || []).map(function (a) { return conteoCol_(h, filas, a); }).filter(Boolean).slice(0, 3);
+  res.forEach(function (x) { tg += '📊 <i>' + esc(x) + '</i>\n'; });
+  tg += '━━━━━━━━━━━━━━━━━\n\n';
+  const lim = pg.todo ? (esWeb(chatId) ? 400 : 60) : (esWeb(chatId) ? 40 : 12);
+  const ini = (pg.pag - 1) * lim;
+  filas.slice(ini, ini + lim).forEach(function (r, i) { tg += (ini + i + 1) + '. ' + esc(filaCols_(h, r, idxs, 9)) + '\n\n'; });
+  if (ini >= filas.length) tg += 'No hay página ' + pg.pag + ' (son ' + Math.ceil(filas.length / lim) + ').';
+  else if (ini + lim < filas.length) {
+    const base = textoNorm.replace(/\bpag(?:ina)?\s*\d+\b/, ' ').replace(/\b(todo|todos|todas|completo|completa)\b/g, ' ').replace(/\s+/g, ' ').trim();
+    tg += '...mostrando ' + (ini + 1) + '–' + (ini + lim) + ' de ' + filas.length + '. Sigue con <code>' + esc(base) + ' pag ' + (pg.pag + 1) + '</code> · todas: <code>' + esc(base) + ' todo</code>';
+  }
+  await enviar(chatId, tg);
+}
+
+async function cmdParrilla_(chatId, textoNorm) {
+  const resto = textoNorm.replace(/^parrillas?\b/, ' ');
+  const dep = PARRILLAS_.find(function (d) { return new RegExp('\\b' + normEnc(d) + '\\b').test(normEnc(resto)); });
+  if (!dep) {
+    await enviar(chatId, '🧩 <b>Parrillas por departamento</b>\n' + PARRILLAS_.map(function (d) { return '<code>parrilla ' + d.toLowerCase() + '</code>'; }).join(' · '));
+    return;
+  }
+  const sin = normEnc(resto).replace(new RegExp('\\b' + normEnc(dep) + '\\b'), ' ');
+  await cmdTabla_(chatId, { libro: 'SITE', tab: 'Parrilla ' + dep, icono: '🧩', titulo: 'Parrilla ' + dep,
+    resumen: ['DECISION', 'ESTADO', 'KAM', 'ESTATUS'], cols: null }, sin);
+}
+
+// "envio" = la hoja ENVIO N dd/mm/aa más reciente (o la N que pidas).
+async function cmdEnvio_(chatId, textoNorm) {
+  await refrescarCatalogo_();
+  const hojasEnvio = CAT_.filter(function (h) { return h[0] === 'SITE' && /^envio \d+/.test(normEnc(h[1])); })
+    .map(function (h) { return { h: h, n: parseInt(normEnc(h[1]).match(/^envio (\d+)/)[1], 10) }; })
+    .sort(function (a, b) { return b.n - a.n; });
+  if (!hojasEnvio.length) {
+    await enviar(chatId, '🚚 No veo una hoja de envío (ENVIO N). Usa <code>wfs</code> para el envío en preparación o <code>historico envios</code>.');
+    return;
+  }
+  const pedido = textoNorm.match(/\benvios?\s+(?:wfs\s+)?(\d+)/);
+  const elegida = (pedido && hojasEnvio.find(function (x) { return x.n === parseInt(pedido[1], 10); })) || hojasEnvio[0];
+  const sin = textoNorm.replace(/^envios?\s*(wfs)?\s*\d*/, ' ');
+  await cmdTabla_(chatId, { libro: 'SITE', tab: elegida.h[1], icono: '🚚', titulo: elegida.h[1],
+    resumen: ['ESTADO', 'ESTATUS', 'CATEGORIA'], cols: null }, sin);
 }
 
 // ============================================================
@@ -2340,8 +2785,22 @@ async function enviar(chatId,texto){
     _webBuffer.get(chatId).push(texto);
     return;
   }
-  try{await fetch(TELEGRAM_API+'/sendMessage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:chatId,text:texto,parse_mode:'HTML'})});}
-  catch(e){console.error('enviar:',e.message);}
+  const partes = partirTexto_(String(texto), 3900);
+  for (const parte of partes) {
+    try{await fetch(TELEGRAM_API+'/sendMessage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:chatId,text:parte,parse_mode:'HTML'})});}
+    catch(e){console.error('enviar:',e.message);}
+  }
+}
+// Telegram corta a 4096 caracteres: partir por líneas.
+function partirTexto_(t, max) {
+  if (t.length <= max) return [t];
+  const out = []; let cur = '';
+  t.split('\n').forEach(function (l) {
+    if (cur && (cur + '\n' + l).length > max) { out.push(cur); cur = l.slice(0, max); }
+    else cur = cur ? cur + '\n' + l : l.slice(0, max);
+  });
+  if (cur) out.push(cur);
+  return out;
 }
 async function wa_send(chatId,msg){
   const u=USUARIOS[chatId];

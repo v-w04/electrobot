@@ -1744,6 +1744,16 @@ body.girly-mode .typing span { background: #BA8FFF; }
                 <div class="tablero-titulo">Killers</div>
                 <div class="tablero-sub">Walmart · Vigentes</div>
               </button>
+              <button class="tablero" onclick="abrirCategoria('operacion')">
+                <div class="tablero-icon">🧰</div>
+                <div class="tablero-titulo">Operación</div>
+                <div class="tablero-sub">Cancelaciones · WFS · Casos</div>
+              </button>
+              <button class="tablero" onclick="abrirCategoria('hojas')">
+                <div class="tablero-icon">📚</div>
+                <div class="tablero-titulo">Hojas</div>
+                <div class="tablero-sub">Site Sheet · Venta Diaria</div>
+              </button>
             </div>
 
             <div class="suggestions-header">
@@ -2375,7 +2385,51 @@ const CATEGORIAS = {
   marketplaces: {
     icon: '🔪', nombre: 'Killers',
     subs: [
-      { icon: 'fas fa-bullseye',   label: 'Killers',  action: () => abrirSubcomando('killers') }
+      { icon: 'fas fa-bullseye',   label: 'Killers',  action: () => abrirSubcomando('killers') },
+      { icon: 'fas fa-arrow-trend-down', label: 'Bajo mínimo', action: () => { cerrarCategoria(); sendMessage('killers bajo minimo'); } },
+      { icon: 'fas fa-circle-question',  label: 'Sin mínimo',  action: () => { cerrarCategoria(); sendMessage('killers sin minimo'); } },
+      { icon: 'fas fa-door-open',        label: 'Fuera',       action: () => { cerrarCategoria(); sendMessage('killers fuera'); } },
+      { icon: 'fas fa-scale-balanced',   label: 'Comparar WM', action: () => { cerrarCategoria(); sendMessage('comparar walmart'); } },
+      { icon: 'fas fa-clock-rotate-left',label: 'Historial',   action: () => { cerrarCategoria(); sendMessage('historico killers'); } }
+    ]
+  },
+  operacion: {
+    icon: '🧰', nombre: 'Operación',
+    subs: [
+      { icon: 'fas fa-ban',           label: 'Cancelaciones', action: () => { cerrarCategoria(); sendMessage('cancelaciones'); } },
+      { icon: 'fas fa-recycle',       label: 'Republicar',    action: () => { cerrarCategoria(); sendMessage('republicar'); } },
+      { icon: 'fas fa-folder-open',   label: 'Casos Walmart', action: () => { cerrarCategoria(); sendMessage('casos walmart'); } },
+      { icon: 'fas fa-truck-fast',    label: 'WFS',           action: () => { cerrarCategoria(); sendMessage('wfs'); } },
+      { icon: 'fas fa-truck',         label: 'Envío',         action: () => { cerrarCategoria(); sendMessage('envio'); } },
+      { icon: 'fas fa-dolly',         label: 'Traslados',     action: () => { cerrarCategoria(); sendMessage('traslados'); } },
+      { icon: 'fas fa-money-bill-transfer', label: 'Cobro distinto', action: () => { cerrarCategoria(); sendMessage('cobro distinto'); } },
+      { icon: 'fas fa-lightbulb',     label: 'Oportunidades', action: () => { cerrarCategoria(); sendMessage('oportunidades'); } },
+      { icon: 'fas fa-chart-column',  label: 'Ventas 30 días',action: () => { cerrarCategoria(); sendMessage('ventas 30 dias'); } }
+    ]
+  },
+  hojas: {
+    icon: '📚', nombre: 'Hojas',
+    subs: [
+      { icon: 'fas fa-list',          label: 'Pestañas',      action: () => { cerrarCategoria(); sendMessage('hojas'); } },
+      { icon: 'fas fa-table-cells',   label: 'Parrillas',     action: () => { cerrarCategoria(); sendMessage('parrilla'); } },
+      { icon: 'fas fa-link',          label: 'EDI',           action: () => { cerrarCategoria(); sendMessage('edi'); } },
+      { icon: 'fas fa-dna',           label: 'Variantes',     action: () => { cerrarCategoria(); sendMessage('variantes'); } },
+      { icon: 'fas fa-gift',          label: 'Promociones',   action: () => { cerrarCategoria(); sendMessage('promociones'); } },
+      { icon: 'fas fa-percent',       label: 'Comisiones',    action: () => { cerrarCategoria(); sendMessage('comisiones'); } },
+      { icon: 'fas fa-lock',          label: 'Bloqueados',    action: () => { cerrarCategoria(); sendMessage('bloqueados'); } },
+      { icon: 'fas fa-heart-pulse',   label: 'Salud',         action: () => { cerrarCategoria(); sendMessage('salud'); } },
+      { icon: 'fas fa-table-columns', label: 'Columnas',      action: () => { cerrarCategoria(); setInput('columnas '); } },
+      { icon: 'fas fa-scroll',        label: 'Log',           action: () => { cerrarCategoria(); sendMessage('log'); } },
+      { icon: 'fas fa-scroll',        label: 'Log ventas',    action: () => { cerrarCategoria(); sendMessage('log ventas'); } },
+      { icon: 'fas fa-users',         label: 'KAMs',          action: () => { cerrarCategoria(); sendMessage('kams'); } },
+      { icon: 'fas fa-envelope',      label: 'Correo',        action: () => { cerrarCategoria(); sendMessage('correo'); } },
+      { icon: 'fas fa-paper-plane',   label: 'Envíos killers',action: () => { cerrarCategoria(); sendMessage('envios killers'); } },
+      { icon: 'fas fa-id-card',       label: 'Choferes',      action: () => { cerrarCategoria(); sendMessage('choferes'); } },
+      { icon: 'fas fa-van-shuttle',   label: 'Camionetas',    action: () => { cerrarCategoria(); sendMessage('camionetas'); } },
+      { icon: 'fas fa-book',          label: 'Índice',        action: () => { cerrarCategoria(); sendMessage('indice'); } },
+      { icon: 'fas fa-book-open',     label: 'Guía menú',     action: () => { cerrarCategoria(); sendMessage('guia'); } },
+      { icon: 'fas fa-robot',         label: 'Preguntar',     action: () => { cerrarCategoria(); setInput('cuántos '); } },
+      { icon: 'fas fa-magnifying-glass', label: 'Buscar',     action: () => { cerrarCategoria(); enfocarInput(); } }
     ]
   }
 };
@@ -2600,6 +2654,11 @@ function limpiarChat() {
   if (window.innerWidth > 768) messageInput.focus();
 }
 
+function setInput(txt) {
+  messageInput.value = txt;
+  messageInput.focus();
+}
+
 function enfocarInput() {
   cerrarSidebarSiMobile();
   if (window.innerWidth > 768) messageInput.focus();
@@ -2640,8 +2699,22 @@ const POOL_ATAJOS = [
   { q: 'precios erroneos hoy',        icon: 'fa-tag',                  title: 'Precios erróneos hoy',  sub: 'Errores del día' },
   { q: 'venta walmart hoy',           icon: 'fa-cart-shopping',        title: 'Venta Walmart hoy',     sub: 'Pedidos del día' },
   { q: 'venta cva hoy',               icon: 'fa-truck-ramp-box',       title: 'Pedidos CVA hoy',       sub: 'Del día' },
+  { q: 'cancelaciones',               icon: 'fa-ban',                  title: 'Cancelaciones',         sub: 'Correo + sobreventa' },
+  { q: 'casos walmart',               icon: 'fa-folder-open',          title: 'Casos con Walmart',     sub: 'Abiertos y por abrir' },
+  { q: 'wfs',                         icon: 'fa-truck-fast',           title: 'WFS',                   sub: 'Envío en preparación' },
+  { q: 'republicar',                  icon: 'fa-recycle',              title: 'Republicar',            sub: 'SKU por republicar' },
+  { q: 'killers bajo minimo',         icon: 'fa-arrow-trend-down',     title: 'Killers bajo mínimo',   sub: 'Pérdida por KAM' },
+
+  { q: 'cuántos killers vigentes hay?', icon: 'fa-robot',            title: 'Pregúntale al bot',     sub: 'Responde con datos reales' },
+  { q: 'columnas cancelaciones',      icon: 'fa-table-columns',        title: 'Columnas de una hoja',  sub: 'Encabezados y ejemplo' },
+  { q: 'cancelaciones todo',          icon: 'fa-list-check',           title: 'Cancelaciones (todo)',  sub: 'Sin límite de filas' },
+  { q: 'log',                         icon: 'fa-scroll',               title: 'Log de Sheet Site',     sub: 'Corridas y errores' },
+  { q: 'kams',                        icon: 'fa-users',                title: 'KAMs',                  sub: 'Grupos y correos' },
+  { q: 'hojas',                       icon: 'fa-list',                 title: 'Todas las pestañas',    sub: 'Sheet Site + Venta Diaria' },
 
   // ── GUÍAS CONVERSACIONALES ────────────────────────────────────
+  { type: 'guide', id: 'preguntar_datos', icon: 'fa-question',        title: '¿Cómo le pregunto al bot?', sub: 'Razona con tus hojas' },
+  { type: 'guide', id: 'ver_hoja',        icon: 'fa-question',        title: '¿Cómo veo cualquier hoja?', sub: 'Control total' },
   { type: 'guide', id: 'buscar_stock',   icon: 'fa-question',          title: '¿Cómo busco un producto?',  sub: 'Stock por SKU o nombre' },
   { type: 'guide', id: 'consultar_precio', icon: 'fa-question',        title: '¿Cómo consulto un precio?', sub: 'Mínimo, normal, máximo' },
 
@@ -2676,6 +2749,28 @@ const GUIAS = {
     ],
     filtroId: 'precio',
     filtroLabel: 'Abrir consulta de precio'
+  },
+  preguntar_datos: {
+    titulo: '🤖 Cómo preguntarle al bot',
+    intro: 'Escribe la pregunta como hablas. El bot elige las pestañas de Sheet Site y Venta Diaria, calcula conteos y sumas exactos en vivo y razona la respuesta. No guarda nada.',
+    ejemplos: [
+      { cmd: 'cuántos killers vigentes hay?',            label: '• Conteos' },
+      { cmd: 'cuál es el total de valor parado en oportunidades?', label: '• Sumas' },
+      { cmd: 'qué cancelaciones vienen de sobreventa CVA?', label: '• Filtrar y listar' },
+      { cmd: 'compara killers bajo mínimo con estado killers', label: '• Cruzar pestañas' }
+    ]
+  },
+  ver_hoja: {
+    titulo: '📚 Cómo ver cualquier hoja',
+    intro: 'Todas las pestañas están expuestas. <code>hojas</code> lista todo; <code>hoja &lt;nombre&gt; &lt;filtro&gt;</code> muestra filas; <code>columnas &lt;nombre&gt;</code> muestra encabezados; agrega <code>todo</code> o <code>pag 2</code> para ver más filas.',
+    ejemplos: [
+      { cmd: 'hojas',                    label: '• Lista de pestañas' },
+      { cmd: 'columnas wfs',             label: '• Encabezados de WFS' },
+      { cmd: 'cancelaciones todo',       label: '• Todas las filas' },
+      { cmd: 'hoja killers activos pag 2', label: '• Siguiente página' },
+      { cmd: 'log ventas',               label: '• Log de Venta Diaria' },
+      { cmd: 'kams',                     label: '• KAMs y correos' }
+    ]
   },
 };
 
