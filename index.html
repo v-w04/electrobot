@@ -2420,7 +2420,6 @@ const CATEGORIAS = {
       { icon: 'fas fa-heart-pulse',   label: 'Salud',         action: () => { cerrarCategoria(); sendMessage('salud'); } },
       { icon: 'fas fa-table-columns', label: 'Columnas',      action: () => { cerrarCategoria(); setInput('columnas '); } },
       { icon: 'fas fa-scroll',        label: 'Log',           action: () => { cerrarCategoria(); sendMessage('log'); } },
-      { icon: 'fas fa-scroll',        label: 'Log ventas',    action: () => { cerrarCategoria(); sendMessage('log ventas'); } },
       { icon: 'fas fa-users',         label: 'KAMs',          action: () => { cerrarCategoria(); sendMessage('kams'); } },
       { icon: 'fas fa-envelope',      label: 'Correo',        action: () => { cerrarCategoria(); sendMessage('correo'); } },
       { icon: 'fas fa-paper-plane',   label: 'Envíos killers',action: () => { cerrarCategoria(); sendMessage('envios killers'); } },
@@ -2428,6 +2427,12 @@ const CATEGORIAS = {
       { icon: 'fas fa-van-shuttle',   label: 'Camionetas',    action: () => { cerrarCategoria(); sendMessage('camionetas'); } },
       { icon: 'fas fa-book',          label: 'Índice',        action: () => { cerrarCategoria(); sendMessage('indice'); } },
       { icon: 'fas fa-book-open',     label: 'Guía menú',     action: () => { cerrarCategoria(); sendMessage('guia'); } },
+      { icon: 'fas fa-bullseye',      label: 'Ventas killers',action: () => { cerrarCategoria(); sendMessage('ventas killers'); } },
+      { icon: 'fas fa-chart-line',    label: 'Resumen ventas',action: () => { cerrarCategoria(); sendMessage('resumen ventas'); } },
+      { icon: 'fas fa-truck',         label: 'Pedidos CVA',   action: () => { cerrarCategoria(); sendMessage('pedidos cva'); } },
+      { icon: 'fas fa-siren-on',      label: 'Alertas precio',action: () => { cerrarCategoria(); sendMessage('historico alertas'); } },
+      { icon: 'fas fa-box',           label: 'En camino',     action: () => { cerrarCategoria(); sendMessage('en camino'); } },
+      { icon: 'fas fa-dolly',         label: 'Recolección',   action: () => { cerrarCategoria(); sendMessage('recoleccion'); } },
       { icon: 'fas fa-robot',         label: 'Preguntar',     action: () => { cerrarCategoria(); setInput('cuántos '); } },
       { icon: 'fas fa-magnifying-glass', label: 'Buscar',     action: () => { cerrarCategoria(); enfocarInput(); } }
     ]
@@ -2710,7 +2715,7 @@ const POOL_ATAJOS = [
   { q: 'cancelaciones todo',          icon: 'fa-list-check',           title: 'Cancelaciones (todo)',  sub: 'Sin límite de filas' },
   { q: 'log',                         icon: 'fa-scroll',               title: 'Log de Sheet Site',     sub: 'Corridas y errores' },
   { q: 'kams',                        icon: 'fa-users',                title: 'KAMs',                  sub: 'Grupos y correos' },
-  { q: 'hojas',                       icon: 'fa-list',                 title: 'Todas las pestañas',    sub: 'Sheet Site + Venta Diaria' },
+  { q: 'hojas',                       icon: 'fa-list',                 title: 'Todas las pestañas',    sub: 'Sheet Site' },
 
   // ── GUÍAS CONVERSACIONALES ────────────────────────────────────
   { type: 'guide', id: 'preguntar_datos', icon: 'fa-question',        title: '¿Cómo le pregunto al bot?', sub: 'Razona con tus hojas' },
@@ -2752,7 +2757,7 @@ const GUIAS = {
   },
   preguntar_datos: {
     titulo: '🤖 Cómo preguntarle al bot',
-    intro: 'Escribe la pregunta como hablas. El bot elige las pestañas de Sheet Site y Venta Diaria, calcula conteos y sumas exactos en vivo y razona la respuesta. No guarda nada.',
+    intro: 'Escribe la pregunta como hablas. El bot elige las pestañas de Sheet Site, calcula conteos y sumas exactos en vivo y razona la respuesta. No guarda nada.',
     ejemplos: [
       { cmd: 'cuántos killers vigentes hay?',            label: '• Conteos' },
       { cmd: 'cuál es el total de valor parado en oportunidades?', label: '• Sumas' },
@@ -2768,7 +2773,6 @@ const GUIAS = {
       { cmd: 'columnas wfs',             label: '• Encabezados de WFS' },
       { cmd: 'cancelaciones todo',       label: '• Todas las filas' },
       { cmd: 'hoja killers activos pag 2', label: '• Siguiente página' },
-      { cmd: 'log ventas',               label: '• Log de Venta Diaria' },
       { cmd: 'kams',                     label: '• KAMs y correos' }
     ]
   },

@@ -14,7 +14,7 @@
 // Sello de version. El GET de la raiz lo devuelve y 5-SUBIR-TODO.bat lo
 // compara contra WORKER_VERSION de _config.bat: asi el verde solo sale si
 // Cloudflare de verdad esta sirviendo este codigo y no el anterior.
-const BOT_VERSION    = 'v8.6';
+const BOT_VERSION    = 'v8.8';
 
 let TELEGRAM_API     = '';     // se arma en cargarEnv() con env.TELEGRAM_TOKEN
 let GOOGLE_SA        = null;   // env.GOOGLE_SA_JSON parseado (cuenta de servicio)
@@ -51,7 +51,7 @@ function avisoFiltroAmplio(total) {
 // ── Sheet IDs (fuentes vivas, sept 2026) ────────────────────
 const ID = {
   SITE:         '1Yjwyyv7EF5CJ3tJ2DgGzXO7QHxyrC0aCCSj1MHL5AKY', // Sheet Site: inventario, precios, Killers, Walmart
-  VENTA_DIARIA: '17S65PqXK1DfJeHloJ4IFt-3K-MnQKOQaN_BiE9RUYaw'  // Venta Diaria Odoo 2026: ventas, alertas, killers, sobreventa
+  VENTA_DIARIA: '1Yjwyyv7EF5CJ3tJ2DgGzXO7QHxyrC0aCCSj1MHL5AKY'  // (4-nov) Venta Diaria se retiro: TODO vive en Sheet Site
 };
 
 
@@ -63,8 +63,8 @@ const RETIRADO = {
   vendedor:    '👤 <i>Vendedor incorrecto</i> se dio de baja: Venta Diaria ya no lleva esa revisión.',
   entradas:    '📥 <i>Entradas</i> se dio de baja: su hoja dejó de actualizarse.',
   bodega:      '🏭 El inventario del Sheet Site ya no trae la bodega de cada SKU. Usa <code>stock [sku o nombre]</code>.',
-  checador:    '⏰ El <i>Checador</i> (asistencia, bonos, vacaciones, turnos, cumpleaños) se retiró del bot: su hoja ya no existe. El bot solo lee Sheet Site y Venta Diaria.',
-  traslados:   '🚛 <i>Traslados</i> se retiró del bot: su hoja ya no existe. El bot solo lee Sheet Site y Venta Diaria.',
+  checador:    '⏰ El <i>Checador</i> (asistencia, bonos, vacaciones, turnos, cumpleaños) se retiró del bot: su hoja ya no existe. El bot solo lee Sheet Site.',
+  traslados:   '🚛 <i>Traslados</i> se retiró del bot: su hoja ya no existe. El bot solo lee Sheet Site.',
   ventiapp:    '🛒 <i>Ventiapp</i> se retiró del bot: su hoja ya no existe. Para existencias usa <code>stock [sku o nombre]</code>.',
   interno:     '🛠️ Los comandos internos eran del Checador 6.0, que ya no se usa. Se retiraron.'
 };
@@ -412,7 +412,7 @@ async function router(chatId, texto, nombre, env) {
   const COMANDOS_CONOCIDOS = [
     'ayuda','comandos','stock','venta','ventas','precio','precios',
     'sobreventa','killers','killer','sku','hojas','hoja','buscar',
-    'cancelaciones','republicar','casos','traslados','parrilla','parrillas','oportunidades','promociones','comisiones','variantes','comparar','bloqueados','publicaciones','autorizaciones','restricciones','historico','columnas','kams','correo','choferes','camionetas'
+    'cancelaciones','republicar','casos','traslados','parrilla','parrillas','oportunidades','promociones','comisiones','variantes','comparar','bloqueados','publicaciones','autorizaciones','restricciones','historico','columnas','kams','correo','choferes','camionetas','recoleccion','resumen'
   ];
   const palabras1 = tNorm.split(/\s+/);
   const primeraP = palabras1[0] || '';
@@ -670,7 +670,7 @@ async function cmdVenta(chatId, consulta) {
   if (!canalesEncontrados.length){
     const retirado = CANALES_RETIRADOS.find(function(k){ return new RegExp('\\b'+k+'\\b').test(sinAcentos(restoLower)); });
     if (retirado) {
-      await enviar(chatId,'ℹ️ Venta Diaria ya solo lleva <b>Walmart</b> y <b>pedidos CVA</b>. '+
+      await enviar(chatId,'ℹ️ Las ventas solo llevan <b>Walmart</b> y <b>pedidos CVA</b>. '+
         'Las hojas de los demás canales se eliminaron del libro.\n\nEj: <code>venta walmart hoy</code> · <code>venta cva semana pasada</code>');
       return;
     }
@@ -681,7 +681,7 @@ async function cmdVenta(chatId, consulta) {
   // Ejecutar uno por uno si hay múltiples
   for (const hojaCanal of canalesEncontrados) {
     await enviar(chatId,'💰 <b>'+esc(hojaCanal)+'</b>'+(fechaLabel?' · <b>'+esc(fechaLabel)+'</b>':'')+'...');
-    const datos=await csv(ID.VENTA_DIARIA, hojaCanal);
+    const datos=await csv(ID.SITE, canalTab_(hojaCanal));
     if (!datos){await enviar(chatId,'❌ Sin acceso a "'+hojaCanal+'".');continue;}
 
     let filas=datos.slice(1).filter(function(r){
@@ -910,7 +910,7 @@ async function cmdPreciosErroneos(chatId, consulta) {
 
   const [lec, K] = await Promise.all([
     leerHojaPorEncabezado(ID.VENTA_DIARIA, 'Histórico de alertas', 'DIFERENCIA', {
-      FECHA: ['FECHA ALERTA', 'FECHA', 'VENTA DIARIA ODOO'], SO: ['SO', 'NUMERO SO'],
+      FECHA: ['FECHA ALERTA', 'FECHA', 'HORA', 'FECHA VENTA', 'VENTA DIARIA ODOO'], SO: ['SO', 'NUMERO SO'],
       CLIENTE: ['CLIENTE'], VENDEDOR: ['VENDEDOR'], SKU: ['SKU'], CANTIDAD: ['CANTIDAD'],
       VENTA: ['VENTA'], ERIK: ['ERIK'], DIFERENCIA: ['DIFERENCIA']
     }, ['FECHA', 'SKU', 'VENTA', 'ERIK', 'DIFERENCIA']),
@@ -1092,7 +1092,7 @@ async function cmdKillers(chatId, termino) {
   await enviar(chatId, '🔪 Killers Walmart...');
   const datos = await csv(ID.VENTA_DIARIA, 'KILLERS ACTIVOS');
   const h = filaEncabezados(datos, ['SKU']);
-  if (!h) { await enviar(chatId, '❌ Sin acceso a KILLERS ACTIVOS (Venta Diaria).'); return; }
+  if (!h) { await enviar(chatId, '❌ Sin acceso a Killers activos (Sheet Site).'); return; }
   const c = {
     sku: colPor(h.fila,['SKU']), det: colPor(h.fila,['Detalles del articulo','DETALLES']),
     precio: colPor(h.fila,['PRECIO']), neg: colPor(h.fila,['Precio negociado']),
@@ -1222,7 +1222,7 @@ async function cmdVentaBuscarSO(chatId, termino) {
   // Buscar en paralelo en todas las hojas de canal
   await Promise.all(HOJAS_CANAL.map(async function(hojaCanal) {
     try {
-      const datos = await csv(ID.VENTA_DIARIA, hojaCanal);
+      const datos = await csv(ID.SITE, canalTab_(hojaCanal));
       if (!datos || datos.length < 2) return;
 
       const filas = datos.slice(1).filter(function(r) {
@@ -1441,7 +1441,7 @@ async function ayuda(chatId, nombre) {
   // El bot lee SOLO dos libros: Sheet Site y Venta Diaria Odoo 2026.
   await enviar(chatId,
     '👋 Hola <b>'+esc(nombre||'')+'</b>! Soy el bot de Electronics México 📊\n'+
-    '<i>Comandos disponibles (datos de Sheet Site y Venta Diaria):</i>\n'+
+    '<i>Comandos disponibles (todo viene de Sheet Site):</i>\n'+
     '━━━━━━━━━━━━━━━━━\n\n'+
 
     '<b>📦 INVENTARIO Y STOCK</b> <i>(Sheet Site)</i>\n'+
@@ -1450,7 +1450,7 @@ async function ayuda(chatId, nombre) {
     '<code>stock mayor a 100</code> · <code>Samsung stock menor a 5</code>\n'+
     '<code>sku HP-15FD0113DX-PLA-3027</code> — SKU exacto\n\n'+
 
-    '<b>💰 VENTAS</b> <i>(Venta Diaria: Walmart y pedidos CVA)</i>\n'+
+    '<b>💰 VENTAS</b> <i>(Sheet Site: Ventas Walmart y Pedidos CVA)</i>\n'+
     '<code>venta walmart</code> · <code>venta walmart hoy</code> · <code>venta walmart 25/09/2026</code>\n'+
     '<code>venta cva</code> · <code>venta cva semana pasada</code>\n'+
     '<code>venta walmart 01/09 - 25/09/2026</code> — rango de fechas\n'+
@@ -1460,18 +1460,18 @@ async function ayuda(chatId, nombre) {
     '<code>precio HP</code> · <code>precio 2061</code> — por nombre o últimos 4 dígitos\n'+
     '<code>precio 2061 minimo</code> · <code>precio 4997 cva</code> — una banda o un master\n\n'+
 
-    '<b>🔪 KILLERS WALMART</b> <i>(Venta Diaria · KILLERS ACTIVOS)</i>\n'+
+    '<b>🔪 KILLERS WALMART</b> <i>(Sheet Site · Killers activos)</i>\n'+
     '<code>killers</code> — vigentes, por iniciar y promo de categoría\n'+
     '<code>killers por iniciar</code> · <code>killers vigentes</code> · <code>killer Samsung</code>\n\n'+
 
-    '<b>⚠️ PRECIOS ERRÓNEOS</b> <i>(Venta Diaria · Histórico de alertas)</i>\n'+
+    '<b>⚠️ PRECIOS ERRÓNEOS</b> <i>(Sheet Site · Alertas de precio)</i>\n'+
     '<code>precios erroneos</code> · <code>precios erroneos hoy</code>\n'+
     '<code>precios erroneos Samsung 25/03/2026</code> — SKU + fecha\n\n'+
 
-    '<b>🚨 SOBREVENTA</b> <i>(Venta Diaria · Sobreventa WFS y Pick)</i>\n'+
+    '<b>🚨 SOBREVENTA</b> <i>(Sheet Site · Sobreventa WFS y Pick)</i>\n'+
     '<code>sobreventa</code> · <code>sobreventa hoy</code> · <code>sobreventa SONY</code>\n\n'+
 
-    '<b>🧰 TODO SITE SHEET + VENTA DIARIA</b> <i>(comando directo por pestaña)</i>\n'+
+    '<b>🧰 TODO SITE SHEET</b> <i>(comando directo por pestaña)</i>\n'+
     '🚫 <code>cancelaciones</code> · ♻️ <code>republicar</code> · 📈 <code>ventas 30 dias</code> · 🚛 <code>traslados</code>\n'+
     '🚚 <code>wfs</code> · <code>envio</code> · <code>historico envios</code> · <code>autorizaciones</code> · <code>restricciones</code>\n'+
     '📂 <code>casos walmart</code> · ⚖️ <code>comparar walmart</code> · 💸 <code>cobro distinto</code>\n'+
@@ -1483,9 +1483,11 @@ async function ayuda(chatId, nombre) {
     '<code>hojas</code> — lista de pestañas consultables\n'+
     '<code>hoja killers activos vigente</code> — filas de una pestaña con filtro\n'+
     '<code>buscar 3027</code> — busca en las pestañas principales\n'+
+    '💹 <code>ventas killers</code> · <code>ventas killers historico</code> · <code>resumen ventas</code> · <code>resumen cva</code> · <code>pedidos cva</code> · <code>historico ventas</code>\n'+
+    '🚨 <code>historico alertas</code> · 📦 <code>en camino</code> · 🔎 <code>consulta pedidos</code> · 🚛 <code>recoleccion</code> · 🔥 <code>killers activos</code>\n'+
     '<code>columnas cancelaciones</code> — encabezados (con su letra), llenado y ejemplo de cualquier pestaña\n'+
     '<code>cancelaciones todo</code> · <code>cancelaciones pag 2</code> — ver más filas de cualquier comando\n'+
-    '<code>log</code> · <code>log ventas</code> · <code>kams</code> · <code>correo</code> · <code>envios killers</code> · <code>indice</code> · <code>guia</code> — también están expuestos\n'+
+    '<code>log</code> · <code>kams</code> · <code>correo</code> · <code>envios killers</code> · <code>indice</code> · <code>guia</code> — también están expuestos\n'+
     '<code>cuántos killers vigentes hay?</code> — pregunta en español: la IA elige las pestañas, el bot calcula conteos y sumas exactos y razona la respuesta\n\n'+
 
     '━━━━━━━━━━━━━━━━━\n'+
@@ -1510,10 +1512,9 @@ async function ayuda(chatId, nombre) {
 // No se exponen: Log, Índice, Guía, KAMS (correos), Correo, Envios killers, _Marcas, _Colores.
 
 const LIBROS_BOT = {
-  SITE: { nombre: 'Sheet Site',    alias: ['site', 'sheet site'] },
-  VD:   { nombre: 'Venta Diaria',  alias: ['vd', 'venta diaria', 'ventadiaria'] }
+  SITE: { nombre: 'Sheet Site',    alias: ['site', 'sheet site'] }
 };
-function idLibro_(k) { return k === 'SITE' ? ID.SITE : ID.VENTA_DIARIA; }
+function idLibro_(k) { return ID.SITE; }
 
 // [libro, pestaña, palabras clave (nombre + contenido) para elegirla al preguntar]
 const HOJAS_BOT = [
@@ -1585,33 +1586,32 @@ const HOJAS_BOT = [
   ['SITE', 'WFS RESPALDO 2026-10-26 1008', 'respaldo wfs 26 octubre'],
   ['SITE', 'WFS RESPALDO 2026-10-27 1135', 'respaldo wfs 27 octubre'],
   ['SITE', 'WFS RESPALDO 2026-10-28 1235', 'respaldo wfs 28 octubre'],
-  ['VD', 'LOG Ventas', 'log ventas registro etapa nivel mensaje detalles corridas automaticas sobreventa'],
-  ['VD', '📑 Índice', 'indice libro lista de pestañas'],
-  ['VD', '📖 Guía del menú', 'guia menu opciones que hace cuando usarla nivel'],
-  ['VD', 'KILLERS PEGAR', 'killers pegar area de pegado'],
-  ['VD', 'EXCEPCIONES CATEGORIA', 'excepciones categoria'],
+  ['SITE', 'Ventas Walmart', 'ventas walmart historico pedidos desde octubre 2026 sku importe wfs seller'],
+  ['SITE', 'Ventas killers mes en curso', 'ventas killers mes en curso venta con killer al momento de la venta msi'],
+  ['SITE', 'Ventas killers historico', 'ventas killers historico meses cerrados venta con killer'],
+  ['SITE', 'Resumen venta y killers', 'resumen venta killers por mes wfs seller total diario'],
+  ['SITE', 'Resumen venta CVA', 'resumen venta cva por mes total'],
+  ['SITE', 'Pedidos CVA', 'pedidos cva ventas sku cva odoo correo por venta'],
+  ['SITE', 'Alertas de precio', 'alertas de precio historico precios erroneos venta bajo el minimo diferencia'],
+  ['SITE', 'Cancelada en camino', 'cancelada en camino salio cancelo odoo paquete regrese rastreo'],
+  ['SITE', 'Consulta Pedidos', 'consulta pedidos venta sku guia estatus rastreo'],
+  ['SITE', 'Categorias republicar', 'categorias republicar lista categorias'],
+  ['SITE', 'Republicar respaldo', 'republicar respaldo copia'],
+  ['SITE', 'Recoleccion Historial', 'recoleccion historial solicitudes fecha resultado'],
+  ['SITE', 'Recoleccion Formulario', 'recoleccion formulario walmart cambio'],
+  ['SITE', 'Casos Walmart', 'casos walmart folio caso abierto motivo estado seguimiento resolucion correo'],
+  ['SITE', 'Comparar Walmart', 'comparar walmart decision minimo aplicable carga diferencia estado stock problema accion caso'],
+  ['SITE', 'Killers bajo minimo', 'killers bajo minimo perdida falta cupon kam departamento accion'],
+  ['SITE', 'Killers sin minimo', 'killers sin minimo dashboard site'],
+  ['SITE', 'Killers activos', 'killers activos vigentes por iniciar kam carga cupon negociado'],
+  ['SITE', 'Killers historico', 'killers historico fotos carga septiembre octubre noviembre'],
+  ['SITE', 'Categoria revisar', 'categoria revisar kam departamento perdida'],
+  ['SITE', 'Precios variaciones', 'precios variaciones a mano'],
+  ['SITE', 'Cambio Walmart', 'cambio walmart hoja de trabajo cambio de precios'],
+  ['SITE', 'EXPORTAR', 'exportar precio final carga walmart'],
+  ['SITE', 'MINIMO', 'minimo precio minimo sku walmart'],
+  ['SITE', 'MAXIMO', 'maximo precio maximo sku walmart'],
   ['SITE', 'Catalogo', 'catalogo sku referencia nombre categoria'],
-  ['VD', 'KILLERS ACTIVOS', 'killers activos vigentes por iniciar estado kam carga cupon negociado origen'],
-  ['VD', 'KILLERS BAJO MINIMO', 'killers bajo minimo perdida falta cupon kam departamento accion sugerida'],
-  ['VD', 'KILLERS FUERA', 'killers fuera motivo bloqueado walmart minimo aplicable perdida'],
-  ['VD', 'CATEGORIA REVISAR', 'categoria revisar sku kam departamento tipo producto estado perdida'],
-  ['VD', 'COBRO DISTINTO', 'cobro distinto comision cobrada debida causa categoria pedidos pesos promo'],
-  ['VD', 'COBRO DISTINTO DETALLE', 'cobro distinto detalle pedido cobrado debido diferencia comision envio venta'],
-  ['VD', 'CASOS WALMART', 'casos walmart folio caso abierto motivo estado seguimiento resolucion correo precio cero'],
-  ['VD', 'PRECIO LIBRE', 'precio libre sku motivo hasta vende mas barato'],
-  ['VD', 'COMPARAR WALMART', 'comparar walmart decision dejar cambiar minimo aplicable carga diferencia estado stock problema accion sugerida caso'],
-  ['VD', 'KILLERS HISTORICO', 'killers historico carga septiembre octubre registrado recibimos negociado'],
-  ['VD', 'WALMART', 'ventas venta walmart pedidos ordenes so vendedor importe'],
-  ['VD', 'PEDIDOS CVA', 'ventas venta pedidos cva ordenes so vendedor importe'],
-  ['VD', 'Histórico de alertas', 'historico alertas precios erroneos diferencia erik venta'],
-  ['VD', 'SKU ASIGNADOS', 'sku asignados principal grupo equivalentes'],
-  ['VD', 'Sobreventa WFS', 'sobreventa wfs referencia documento origen qty demandada realizada'],
-  ['VD', 'Sobreventa Pick', 'sobreventa pick referencia documento origen qty demandada realizada'],
-  ['VD', 'PRECIOS ERIK', 'precios erik walmart clasica premium killers sin -2'],
-  ['VD', 'EXPORTAR', 'exportar precio final carga archivo walmart'],
-  ['VD', 'MINIMO', 'minimo precio minimo sku walmart'],
-  ['VD', 'MAXIMO', 'maximo precio maximo sku walmart'],
-  ['VD', 'PRECIOS VARIACIONES', 'precios variaciones sku']
 ];
 // Catálogo vivo: si hay cuenta de servicio (GOOGLE_SA_JSON) el bot lee la lista
 // real de pestañas de los dos libros (cada 5 min), así una pestaña nueva se
@@ -1626,7 +1626,7 @@ async function refrescarCatalogo_() {
     const tok = await googleToken();
     if (!tok) return;
     const nuevo = [];
-    for (const k of ['SITE', 'VD']) {
+    for (const k of ['SITE']) {
       const r = await fetch('https://sheets.googleapis.com/v4/spreadsheets/' + idLibro_(k) + '?fields=sheets.properties.title',
         { headers: { Authorization: 'Bearer ' + tok } });
       if (!r.ok) { console.error('catalogo ' + k + ': HTTP ' + r.status); return; }
@@ -1647,8 +1647,8 @@ async function refrescarCatalogo_() {
 const BUSCAR_EN = [['SITE','Concentrado'],['SITE','Variantes'],['SITE','Inventarios'],['SITE','Walmart EDI'],['SITE','Killers'],
                    ['SITE','Cancelaciones'],['SITE','Republicar'],['SITE','Cruce EDI'],['SITE','Estado Killers'],['SITE','WFS'],
                    ['SITE','Oportunidades'],['SITE','Ventas 30 dias'],['SITE','Bloqueados'],
-                   ['VD','KILLERS ACTIVOS'],['VD','KILLERS HISTORICO'],['VD','PRECIOS ERIK'],['VD','COMPARAR WALMART'],
-                   ['VD','CASOS WALMART'],['VD','KILLERS BAJO MINIMO'],['VD','Histórico de alertas']];
+                   ['SITE','Killers activos'],['SITE','Killers historico'],['SITE','Comparar Walmart'],['SITE','Casos Walmart'],
+                   ['SITE','Killers bajo minimo'],['SITE','Alertas de precio'],['SITE','Ventas Walmart'],['SITE','Pedidos CVA']];
 
 const STOP_ = new Set(['cuantos','cuantas','cuanto','cual','cuales','que','quien','quienes','como','donde','cuando','hay','tiene','tienen',
   'los','las','del','por','para','con','una','uno','unos','unas','dame','muestrame','lista','listame','dime','todos','todas','esta','este',
@@ -1676,7 +1676,6 @@ function mejoresTabs_(pregunta, max) {
       if (claves.some(function (c) { return c === w || (r.length >= 4 && c.indexOf(r) === 0); })) p += 1;
     });
     if (norm.indexOf(normEnc(h[1])) !== -1) p += (h[1].indexOf(' ') !== -1 ? 4 : 1);          // dijo el nombre de la pestaña
-    if (/\bvd\b|venta diaria/.test(norm) && h[0] === 'VD') p += 1;
     if (/\bsite\b/.test(norm) && h[0] === 'SITE') p += 1;
     return { h: h, p: p };
   }).filter(function (x) { return x.p > 0; });
@@ -1733,7 +1732,7 @@ async function cargarTab_(libro, pestana) {
 async function cmdHojas(chatId) {
   await refrescarCatalogo_();
   let tg = '📚 <b>Pestañas que puedo consultar</b>\n<i>hoja &lt;nombre&gt; [filtro]</i> · <i>buscar &lt;texto&gt;</i> · o pregúntame en español\n━━━━━━━━━━━━━━━━━\n';
-  ['SITE', 'VD'].forEach(function (k) {
+  ['SITE'].forEach(function (k) {
     tg += '\n<b>' + LIBROS_BOT[k].nombre + '</b>\n';
     tg += CAT_.filter(function (h) { return h[0] === k; }).map(function (h) { return '<code>' + esc(h[1]) + '</code>'; }).join(' · ') + '\n';
   });
@@ -1745,8 +1744,7 @@ async function cmdHoja(chatId, consulta) {
   await refrescarCatalogo_();
   let norm = normEnc(consulta);
   let libro = null;
-  if (/\b(vd|venta diaria|ventadiaria)\b/.test(norm)) { libro = 'VD'; norm = norm.replace(/\b(vd|venta diaria|ventadiaria)\b/, ' '); }
-  else if (/\b(site|sheet site)\b/.test(norm)) { libro = 'SITE'; norm = norm.replace(/\b(sheet site|site)\b/, ' '); }
+  if (/\b(site|sheet site)\b/.test(norm)) { libro = 'SITE'; norm = norm.replace(/\b(sheet site|site)\b/, ' '); }
   norm = norm.replace(/\s+/g, ' ').trim();
   const pg = parsePag_(norm); norm = pg.resto;
   if (!norm) { await cmdHojas(chatId); return; }
@@ -1941,7 +1939,7 @@ async function preguntarHojas(chatId, pregunta, env, usarPlan) {
     await enviar(chatId, '🔎 Revisando ' + esc(fuentes.join(' + ')) + '...');
     const txt = await aiCorrer_(env, [
       { role: 'system', content:
-        'Eres el analista de datos de Electronics México (Sheet Site y Venta Diaria). Responde en español de México, directo y claro. ' +
+        'Eres el analista de datos de Electronics México (Sheet Site). Responde en español de México, directo y claro. ' +
         'Razona con los datos que te doy: usa los conteos y estadísticas EXACTOS cuando existan, compara, ordena y cruza pestañas si hace falta. ' +
         'No inventes cifras, SKUs ni fechas. Si solo ves una muestra de filas, dilo. Si los datos no alcanzan, dilo y sugiere "hoja <pestaña> <filtro>". ' +
         'Si piden un listado, dalo en lista corta; si piden un número, empieza con el número.' },
@@ -1960,8 +1958,7 @@ async function preguntarHojas(chatId, pregunta, env, usarPlan) {
 // Encuentra UNA pestaña por nombre (o por palabras clave). { h } | { amb } | { error }
 function resolverTab_(norm) {
   let libro = null, n = String(norm || '');
-  if (/\b(vd|venta diaria|ventadiaria)\b/.test(n)) { libro = 'VD'; n = n.replace(/\b(vd|venta diaria|ventadiaria)\b/, ' '); }
-  else if (/\b(site|sheet site)\b/.test(n)) { libro = 'SITE'; n = n.replace(/\b(sheet site|site)\b/, ' '); }
+  if (/\b(site|sheet site)\b/.test(n)) { libro = 'SITE'; n = n.replace(/\b(sheet site|site)\b/, ' '); }
   n = n.replace(/\s+/g, ' ').trim();
   if (!n) return { error: 'Falta el nombre de la pestaña.' };
   let cand = CAT_.filter(function (h) { return n.indexOf(normEnc(h[1])) !== -1; });
@@ -2019,8 +2016,20 @@ async function cmdColumnas_(chatId, consulta) {
 // col. de cada 'cols' = alias del encabezado; si no existe se omite (no rompe).
 
 const SUBCMD_ = [
-  { re: /^log\s+ventas\b/, libro: 'VD', tab: 'LOG Ventas', icono: '🧾', titulo: 'Log de Venta Diaria',
-    resumen: ['NIVEL', 'ETAPA'], cols: ['Hora', 'Nivel', 'Etapa', 'Mensaje'], orden: 'Hora' },
+  { re: /^ventas?\s+killers?\s+hist[a-z]*\b/, libro: 'SITE', tab: 'Ventas killers historico', icono: '🗄️', titulo: 'Ventas con killer · meses cerrados', resumen: [], cols: null },
+  { re: /^ventas?\s+killers?\b/, libro: 'SITE', tab: 'Ventas killers mes en curso', icono: '🎯', titulo: 'Ventas con killer · mes en curso', resumen: [], cols: null },
+  { re: /^hist[a-z]*\s+ventas?(?:\s+walmart)?\b/, libro: 'SITE', tab: 'Ventas Walmart', icono: '🛒', titulo: 'Ventas Walmart (desde oct-2026)', resumen: [], cols: null },
+  { re: /^resumen\s+(?:de\s+)?cva\b|^resumen\s+venta\s+cva\b/, libro: 'SITE', tab: 'Resumen venta CVA', icono: '📊', titulo: 'Resumen venta CVA', resumen: [], cols: null },
+  { re: /^resumen\s+(?:de\s+)?ventas?\b/, libro: 'SITE', tab: 'Resumen venta y killers', icono: '📊', titulo: 'Resumen venta y killers por mes', resumen: [], cols: null },
+  { re: /^pedidos?\s+cva\b/, libro: 'SITE', tab: 'Pedidos CVA', icono: '🚚', titulo: 'Pedidos CVA', resumen: [], cols: null },
+  { re: /^alertas?\s+(?:de\s+)?precios?\s+hist[a-z]*\b|^hist[a-z]*\s+alertas?\b/, libro: 'SITE', tab: 'Alertas de precio', icono: '🚨', titulo: 'Alertas de precio (historial)', resumen: [], cols: null },
+  { re: /^(?:cancelada?s?\s+)?en\s+camino\b|^cancelada\s+en\s+camino\b/, libro: 'SITE', tab: 'Cancelada en camino', icono: '📦', titulo: 'Cancelada en camino', resumen: [], cols: null },
+  { re: /^consulta\s+pedidos?\b/, libro: 'SITE', tab: 'Consulta Pedidos', icono: '🔎', titulo: 'Consulta Pedidos', resumen: [], cols: null },
+  { re: /^recolecc[a-z]*\s+form[a-z]*\b/, libro: 'SITE', tab: 'Recoleccion Formulario', icono: '📝', titulo: 'Recolección · formulario', resumen: [], cols: null },
+  { re: /^recolecc[a-z]*\b/, libro: 'SITE', tab: 'Recoleccion Historial', icono: '🚛', titulo: 'Recolección · historial', resumen: [], cols: null },
+  { re: /^categorias?\s+republicar\b/, libro: 'SITE', tab: 'Categorias republicar', icono: '🗂️', titulo: 'Categorías para republicar', resumen: [], cols: null },
+  { re: /^republicar\s+respaldo\b/, libro: 'SITE', tab: 'Republicar respaldo', icono: '🗃️', titulo: 'Republicar · respaldo', resumen: [], cols: null },
+  { re: /^killers?\s+activos?\b/, libro: 'SITE', tab: 'Killers activos', icono: '🔥', titulo: 'Killers activos', resumen: ['ESTADO', 'ORIGEN', 'KAM'], cols: null },
   { re: /^log\b/, libro: 'SITE', tab: 'Log', icono: '🧾', titulo: 'Log de Sheet Site',
     resumen: ['NIVEL', 'ETAPA'], cols: ['Hora', 'Nivel', 'Etapa', 'Mensaje'], orden: 'Hora' },
   { re: /^kams?\s+departamentos?\b/, libro: 'SITE', tab: 'KAMS Departamentos', icono: '🧭', titulo: 'KAMS · departamentos', resumen: ['GRUPO KAM'], cols: null },
@@ -2032,9 +2041,7 @@ const SUBCMD_ = [
   { re: /^choferes\b/, libro: 'SITE', tab: 'CATALOGO CHOFERES', icono: '🧑‍✈️', titulo: 'Catálogo de choferes', resumen: [], cols: null },
   { re: /^historico\s+camionetas\b/, libro: 'SITE', tab: 'HISTORICO CAMIONETAS', icono: '🚐', titulo: 'Histórico de camionetas', resumen: [], cols: null },
   { re: /^camionetas?\b/, libro: 'SITE', tab: 'CATALOGO CAMIONETAS', icono: '🚐', titulo: 'Catálogo de camionetas', resumen: [], cols: null },
-  { re: /^indice\s+(?:vd|venta\s+diaria)\b/, libro: 'VD', tab: '📑 Índice', icono: '📑', titulo: 'Índice · Venta Diaria', resumen: [], cols: null },
   { re: /^indice\b/, libro: 'SITE', tab: '📑 Índice', icono: '📑', titulo: 'Índice · Sheet Site', resumen: [], cols: null },
-  { re: /^guia\s+(?:vd|venta\s+diaria)\b/, libro: 'VD', tab: '📖 Guía del menú', icono: '📖', titulo: 'Guía del menú · Venta Diaria', resumen: ['NIVEL', 'SECCION DEL MENU'], cols: null },
   { re: /^guia\b/, libro: 'SITE', tab: '📖 Guía del menú', icono: '📖', titulo: 'Guía del menú · Sheet Site', resumen: ['NIVEL', 'SECCION DEL MENU'], cols: null },
   { re: /^marcas\b/, libro: 'SITE', tab: '_Marcas', icono: '🏷️', titulo: 'Marcas (prefijos)', resumen: [], cols: null },
   { re: /^colores\b/, libro: 'SITE', tab: '_Colores', icono: '🎨', titulo: 'Colores (códigos)', resumen: [], cols: null },
@@ -2053,23 +2060,21 @@ const SUBCMD_ = [
     resumen: ['KILLER'], cols: ['SKU', 'PEDIDO', 'CORTE', 'COBRADO', 'DEBIDO', 'DIF', 'COM', 'ENVIO', 'VENTA'], orden: 'DIF' },
   { re: /^cobros?\s+distintos?\b/, libro: 'SITE', tab: 'Cobro distinto', icono: '💸', titulo: 'Cobro distinto',
     resumen: ['CAUSA', 'PUB'], cols: ['BASE', 'PEDIDOS', 'PESOS', 'CAT COBRA', 'CAT DEBIDA', 'COBRADO', 'DEBIDO', 'PUB', 'CAUSA'], orden: 'PESOS' },
-  { re: /^casos?(?:\s+walmart)?\b/, libro: 'VD', tab: 'CASOS WALMART', icono: '📂', titulo: 'Casos con Walmart',
+  { re: /^casos?(?:\s+walmart)?\b/, libro: 'SITE', tab: 'Casos Walmart', icono: '📂', titulo: 'Casos con Walmart',
     resumen: ['ESTADO', 'TIPO', 'CORREO ENVIADO', 'DETECTADO'],
     cols: ['FOLIO WALMART', 'FECHA ABIERTO', 'SKU', 'TIPO', 'ESTADO', 'CORREO ENVIADO', 'SEGUIMIENTO', 'RESOLUCION', 'FECHA CIERRE'], orden: 'FECHA ABIERTO' },
-  { re: /^comparar(?:\s+walmart)?\b/, libro: 'VD', tab: 'COMPARAR WALMART', icono: '⚖️', titulo: 'Comparar killers vs Walmart',
+  { re: /^comparar(?:\s+walmart)?\b/, libro: 'SITE', tab: 'Comparar Walmart', icono: '⚖️', titulo: 'Comparar killers vs Walmart',
     resumen: ['DECISION', 'PROBLEMA', 'TIPO', 'ESTADO EN WALMART'],
     cols: ['SKU', 'TIPO', 'DECISION', '% VS MINIMO', 'MINIMO APLICABLE', 'PRECIO EN WALMART', 'ESTADO EN WALMART', 'STOCK WALMART', 'PROBLEMA', 'ACCION SUGERIDA'] },
-  { re: /^killers?\s+bajo\s+minimo\b/, libro: 'VD', tab: 'KILLERS BAJO MINIMO', icono: '📉', titulo: 'Killers bajo mínimo',
+  { re: /^killers?\s+bajo\s+minimo\b/, libro: 'SITE', tab: 'Killers bajo minimo', icono: '📉', titulo: 'Killers bajo mínimo',
     resumen: ['CATEGORIA KAM', 'DEPARTAMENTO WALMART'],
     cols: ['SKU WALMART', 'PRODUCTO', 'PRECIO KILLER', 'MINIMO', 'FALTA', '% PERDIDA', 'TERMINA', 'CATEGORIA KAM', 'ACCION SUGERIDA'], orden: 'FALTA' },
   { re: /^killers?\s+sin\s+minimo\b/, libro: 'SITE', tab: 'Killers sin minimo', icono: '❔', titulo: 'Killers sin mínimo',
     resumen: ['KAM MINIMO', 'KAM FALTA'],
     cols: ['SKU', 'TITULO', 'ACTUAL', 'CUPON', 'RECIBIMOS', 'KAM FALTA', 'KAM MINIMO', 'DIAS RESTANTES', 'FIN'] },
-  { re: /^killers?\s+fuera\b/, libro: 'VD', tab: 'KILLERS FUERA', icono: '🚪', titulo: 'Killers fuera',
-    resumen: ['MOTIVO', 'KAM'], cols: ['SKU', 'KAM', 'PRODUCTO', 'MINIMO', 'PRECIO KILLER', '% PERDIDA', 'MOTIVO'] },
   { re: /^estado\s+killers?\b/, libro: 'SITE', tab: 'Estado Killers', icono: '🔪', titulo: 'Estado de killers',
     resumen: ['ESTADO', 'DECISION', 'KAM', 'ESTATUS'], cols: null },
-  { re: /^historico\s+killers?\b/, libro: 'VD', tab: 'KILLERS HISTORICO', icono: '🗂️', titulo: 'Historial de killers',
+  { re: /^historico\s+killers?\b/, libro: 'SITE', tab: 'Killers historico', icono: '🗂️', titulo: 'Historial de killers',
     resumen: ['CARGA', 'ORIGEN'], cols: ['CARGA', 'SKU', 'DETALLES', 'PRECIO NEGOCIADO', 'CUPON', 'RECIBIMOS', 'INICIO', 'FIN'], orden: 'REGISTRADO' },
   { re: /^(?:sku\s+)?enviados?\s+killers?\b|^sku\s+enviados?\b/, libro: 'SITE', tab: 'SKU enviados killers', icono: '📨', titulo: 'SKU enviados en killers',
     resumen: [], cols: null },
@@ -2107,13 +2112,13 @@ const SUBCMD_ = [
     resumen: ['DEPARTAMENTO', 'ESTATUS'], cols: ['SKU', 'DEPARTAMENTO', 'PRECIO', 'ESTATUS', 'NOMBRE', 'CATEGORIA'] },
   { re: /^publicaciones\b/, libro: 'SITE', tab: 'Walmart', icono: '🛒', titulo: 'Publicaciones de Walmart',
     resumen: ['ESTATUS', 'DEPARTAMENTO', 'ES WFS'], cols: ['SKU', 'DEPARTAMENTO', 'PRECIO', 'ESTATUS', 'WFS', 'INV NORMAL', 'NOMBRE'] },
-  { re: /^precio\s+libre\b/, libro: 'VD', tab: 'PRECIO LIBRE', icono: '🆓', titulo: 'Precio libre',
+  { re: /^precio\s+libre\b/, libro: 'SITE', tab: 'Precio libre', icono: '🆓', titulo: 'Precio libre',
     resumen: [], cols: ['SKU', 'MOTIVO', 'HASTA (OPCIONAL)'] },
-  { re: /^precios?\s+variaciones?\b/, libro: 'VD', tab: 'PRECIOS VARIACIONES', icono: '↕️', titulo: 'Precios variaciones',
+  { re: /^precios?\s+variaciones?\b/, libro: 'SITE', tab: 'Precios variaciones', icono: '↕️', titulo: 'Precios variaciones',
     resumen: [], cols: null },
-  { re: /^sku\s+asignados?\b/, libro: 'VD', tab: 'SKU ASIGNADOS', icono: '🧷', titulo: 'SKU asignados',
+  { re: /^sku\s+asignados?\b/, libro: 'SITE', tab: 'SKU asignados', icono: '🧷', titulo: 'SKU asignados',
     resumen: [], cols: null },
-  { re: /^categoria\s+revisar\b/, libro: 'VD', tab: 'CATEGORIA REVISAR', icono: '🧐', titulo: 'Categoría por revisar',
+  { re: /^categoria\s+revisar\b/, libro: 'SITE', tab: 'Categoria revisar', icono: '🧐', titulo: 'Categoría por revisar',
     resumen: ['ESTADO', 'KAM'], cols: null },
   { re: /^inventario\s+actual\b/, libro: 'SITE', tab: 'Inventario Actual', icono: '📦', titulo: 'Inventario actual (Odoo)',
     resumen: [], cols: ['SKU', 'PRODUCTO', 'LIBRE', 'EXISTENCIA', 'RESERVADO', 'EN TRANSITO'] },
@@ -2331,7 +2336,13 @@ async function preguntarGemini(chatId, pregunta, env) {
 // Cache por request: varios comandos piden la misma hoja en paralelo
 // (TURNOS_DEFAULT, METRICAS…). _csvCache evita bajarla N veces.
 const _csvCache = new Map();
+const VD_A_SITE_ = {
+  'KILLERS ACTIVOS': 'Killers activos', 'KILLERS HISTORICO': 'Killers historico', 'SKU ASIGNADOS': 'SKU asignados',
+  'Histórico de alertas': 'Alertas de precio', 'PEDIDOS CVA': 'Pedidos CVA'
+};
+function canalTab_(h) { return h === 'WALMART' ? 'Ventas Walmart' : (VD_A_SITE_[h] || h); }
 async function csv(sheetId, sheetName) {
+  if (sheetId === ID.SITE && VD_A_SITE_[sheetName]) sheetName = VD_A_SITE_[sheetName];
   const clave = sheetId + '|' + sheetName;
   const enCache = _csvCache.get(clave);
   if (enCache && Date.now() - enCache.t < 20000) return enCache.p;
