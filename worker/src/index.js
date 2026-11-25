@@ -910,9 +910,9 @@ async function cmdPreciosErroneos(chatId, consulta) {
 
   const [lec, K] = await Promise.all([
     leerHojaPorEncabezado(ID.VENTA_DIARIA, 'Histórico de alertas', 'DIFERENCIA', {
-      FECHA: ['FECHA ALERTA', 'FECHA', 'HORA', 'FECHA VENTA', 'VENTA DIARIA ODOO'], SO: ['SO', 'NUMERO SO'],
+      FECHA: ['FECHA ALERTA', 'FECHA', 'HORA', 'FECHA VENTA', 'VENTA DIARIA ODOO'], SO: ['SO', 'NUMERO SO', 'FOLIO'],
       CLIENTE: ['CLIENTE'], VENDEDOR: ['VENDEDOR'], SKU: ['SKU'], CANTIDAD: ['CANTIDAD'],
-      VENTA: ['VENTA'], ERIK: ['ERIK'], DIFERENCIA: ['DIFERENCIA']
+      VENTA: ['VENTA', 'PRECIO VENTA'], ERIK: ['ERIK', 'MINIMO'], DIFERENCIA: ['DIFERENCIA']
     }, ['FECHA', 'SKU', 'VENTA', 'ERIK', 'DIFERENCIA']),
     cargarKillers()
   ]);
