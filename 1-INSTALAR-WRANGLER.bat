@@ -157,7 +157,7 @@ echo.
 echo   %ROJO%x  NO HAY NODE.JS%FIN%
 echo      Instalalo de nodejs.org y repite este bat.
 echo.
-pause
+call :LOGO
 exit /b 1
 
 :NPMFAIL
@@ -167,7 +167,7 @@ echo.
 echo   %ROJO%x  NO SE INSTALO WRANGLER%FIN%
 echo      Abre esta ventana como administrador y repite.
 echo.
-pause
+call :LOGO
 exit /b 1
 
 :LOGINFAIL
@@ -178,7 +178,7 @@ echo.
 echo   %ROJO%x  NO ENTRO A CLOUDFLARE%FIN%
 echo      Termina el login en el navegador y repite.
 echo.
-pause
+call :LOGO
 exit /b 1
 
 :SINTOKEN
@@ -186,7 +186,7 @@ echo.
 echo   %ROJO%x  SIN TOKEN NO SE PUEDE SEGUIR%FIN%
 echo      Pidelo a BotFather con /mybots y repite.
 echo.
-pause
+call :LOGO
 exit /b 1
 
 :NOWHSEC
@@ -194,7 +194,7 @@ echo.
 echo   %ROJO%x  NO SE PUDO GENERAR EL SECRETO DEL WEBHOOK%FIN%
 echo      Repite el bat; si sigue, reinstala Node.js.
 echo.
-pause
+call :LOGO
 exit /b 1
 
 :JSONFAIL
@@ -208,7 +208,7 @@ echo.
 echo   %ROJO%x  NO SE ARMARON LOS SECRETOS%FIN%
 echo      Revisa worker\sa.json o borralo y repite.
 echo.
-pause
+call :LOGO
 exit /b 1
 
 :FALTASECRETO
@@ -222,9 +222,9 @@ echo      Al listarlos dijo:
 type "%TEMP%\chk_sl.txt" 2>nul
 type "%TEMP%\chk_sle.txt" 2>nul
 echo.
-echo      %VERDE%Manda este texto a Claude.%FIN%
+echo      Manda este texto a Claude.
 echo.
-pause
+call :LOGO
 exit /b 1
 
 :NOCURL
@@ -232,7 +232,7 @@ echo.
 echo   %ROJO%x  NO HAY CURL EN ESTA PC%FIN%
 echo      Actualiza Windows 10 o corre el setWebhook a mano.
 echo.
-pause
+call :LOGO
 exit /b 1
 
 :WHFAIL
@@ -242,7 +242,7 @@ echo.
 echo   %ROJO%x  TELEGRAM NO ACEPTO EL WEBHOOK%FIN%
 echo      Token mal copiado: repite el bat.
 echo.
-pause
+call :LOGO
 exit /b 1
 
 :WHNOCUADRA
@@ -251,7 +251,7 @@ echo.
 echo   %ROJO%x  EL WEBHOOK NO APUNTA AL WORKER%FIN%
 echo      Revisa WORKER_URL en _config.bat y repite.
 echo.
-pause
+call :LOGO
 exit /b 1
 
 :CHECALOGIN

@@ -59,7 +59,7 @@ echo.
 if "!FALTA!"=="1" (
     echo   %ROJO%^^!  FALTA ALGO%FIN%
     echo.
-    pause
+    call :LOGO
     exit /b 1
 )
 echo %VERDE%  Todo en orden.%FIN%

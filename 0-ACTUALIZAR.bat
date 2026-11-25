@@ -70,7 +70,7 @@ echo.
 echo   %ROJO%x  NO ENCUENTRO GIT%FIN%
 echo      Instala GitHub Desktop o Git para Windows
 echo.
-pause
+call :LOGO
 exit /b 1
 
 :PULLFAIL
@@ -78,7 +78,7 @@ echo.
 echo   %ROJO%x  FALLO LA BAJADA%FIN%
 echo      Conflicto: resuelvelo en GitHub Desktop
 echo.
-pause
+call :LOGO
 exit /b 1
 
 :BUSCARGIT

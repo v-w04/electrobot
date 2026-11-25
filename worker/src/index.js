@@ -14,7 +14,7 @@
 // Sello de version. El GET de la raiz lo devuelve y 5-SUBIR-TODO.bat lo
 // compara contra WORKER_VERSION de _config.bat: asi el verde solo sale si
 // Cloudflare de verdad esta sirviendo este codigo y no el anterior.
-const BOT_VERSION    = 'v8.8';
+const BOT_VERSION    = 'v8.9';
 
 let TELEGRAM_API     = '';     // se arma en cargarEnv() con env.TELEGRAM_TOKEN
 let GOOGLE_SA        = null;   // env.GOOGLE_SA_JSON parseado (cuenta de servicio)
@@ -105,7 +105,30 @@ const CANALES = {
 const CANALES_RETIRADOS = ['sears','liverpool','liv','sanborns','tiktok','coppel','mercado libre',
                            'ml','meli','tiendanube','tienda nube','elektra','totalplay'];
 
-// ── PIN desactivado por el momento ─────────────────────────
+// ── Acceso a la app web ─────────────────────────────────────
+// Opcional: si existe el secreto APP_PIN en Cloudflare (wrangler secret put APP_PIN),
+// /api/query exige el header X-Access-Token con ese valor. Sin el secreto, queda abierto
+// como hasta ahora. Ademas hay un limite de uso por IP (por instancia del worker).
+const MAX_MENSAJE   = 600;
+const LIMITE_POR_MIN = 40;
+const _usoIP = new Map();
+function limiteUso_(ip) {
+  const ahora = Date.now();
+  if (_usoIP.size > 500) { _usoIP.forEach(function (v, k) { if (ahora - v.t > 60000) _usoIP.delete(k); }); }
+  const u = _usoIP.get(ip);
+  if (!u || ahora - u.t > 60000) { _usoIP.set(ip, { t: ahora, n: 1 }); return true; }
+  u.n++;
+  return u.n <= LIMITE_POR_MIN;
+}
+function pinValido_(request, env) {
+  const pin = String(env.APP_PIN || '').trim();
+  if (!pin) return true;
+  const dado = String(request.headers.get('X-Access-Token') || '');
+  if (dado.length !== pin.length) return false;
+  let d = 0;
+  for (let i = 0; i < pin.length; i++) d |= pin.charCodeAt(i) ^ dado.charCodeAt(i);
+  return d === 0;
+}
 
 // ── Memoria de conversación por usuario ─────────────────────
 // Guarda los últimos mensajes por chatId con TTL de 10 minutos
@@ -136,7 +159,7 @@ export default {
         headers: {
           'Access-Control-Allow-Origin': '*',
           'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type',
+          'Access-Control-Allow-Headers': 'Content-Type, X-Access-Token',
           'Access-Control-Max-Age': '86400'
         }
       });
@@ -151,16 +174,22 @@ export default {
     // ── Endpoint app web: POST /api/query { message: "..." } ──
     // Devuelve { messages: ["html1", "html2", ...] } con todas las respuestas
     if (url.pathname === '/api/query' && request.method === 'POST') {
+      if (!pinValido_(request, env)) return jsonCors({ error: 'PIN requerido', pin: true }, 401);
+      if (!limiteUso_(request.headers.get('CF-Connecting-IP') || 'x')) {
+        return jsonCors({ error: 'Demasiadas consultas seguidas. Espera un minuto.' }, 429);
+      }
       let body;
       try { body = await request.json(); } catch(e) {
         return jsonCors({ error: 'JSON inválido' }, 400);
       }
       const texto = String(body.message || '').trim();
       if (!texto) return jsonCors({ error: 'message vacío' }, 400);
+      if (texto.length > MAX_MENSAJE) return jsonCors({ error: 'Mensaje muy largo (máximo ' + MAX_MENSAJE + ' caracteres).' }, 400);
 
       // chatId único para esta sesión web; el prefijo 'web:' activa el buffer
-      const chatId = 'web:' + (body.session || Math.random().toString(36).slice(2));
-      const nombre = body.user || 'Web';
+      const sesion = /^[A-Za-z0-9_-]{1,64}$/.test(String(body.session || '')) ? String(body.session) : Math.random().toString(36).slice(2);
+      const chatId = 'web:' + sesion;
+      const nombre = String(body.user || 'Web').slice(0, 40);
 
       // Limpiar buffer previo de esta sesión
       _webBuffer.delete(chatId);
@@ -168,7 +197,8 @@ export default {
       try {
         await router(chatId, texto, nombre, env);
       } catch(e) {
-        return jsonCors({ error: e.message, messages: _webBuffer.get(chatId) || [] }, 500);
+        console.error('router web: ' + e.message);
+        return jsonCors({ error: 'El bot tuvo un problema con esa consulta. Intenta de nuevo.', messages: _webBuffer.get(chatId) || [] }, 500);
       }
 
       const messages = _webBuffer.get(chatId) || [];

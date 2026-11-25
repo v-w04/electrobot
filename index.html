@@ -2,7 +2,7 @@
 <html lang="es" translate="no">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="google" content="notranslate">
 <meta name="theme-color" content="#0F1A2E">
 <meta name="application-name" content="Bot EM">
@@ -1652,6 +1652,57 @@ body.girly-mode .status-dot {
   box-shadow: 0 0 8px #DB7093;
 }
 body.girly-mode .typing span { background: #BA8FFF; }
+
+/* ============================================================
+   MEJORAS v2.7 — accesibilidad, movimiento reducido, copiar
+   ============================================================ */
+:focus-visible {
+  outline: 2px solid #7fb4ff;
+  outline-offset: 2px;
+}
+button:focus-visible, a:focus-visible, [tabindex]:focus-visible, select:focus-visible {
+  outline: 2px solid #7fb4ff !important;
+  outline-offset: 2px;
+}
+/* Tarjetas de categorías: en pantallas angostas la columna no debe crecer por su texto */
+.tableros-grid { grid-template-columns: repeat(auto-fill, minmax(min(180px, 100%), 1fr)); }
+.tablero { min-width: 0; }
+@media (max-width: 768px) {
+  .tableros-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tablero-sub {
+    white-space: normal;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  }
+}
+.msg-bubble { overflow-wrap: anywhere; }
+.message.bot .msg-bubble { position: relative; }
+.msg-copy {
+  position: absolute; top: 6px; right: 6px;
+  width: 28px; height: 28px; border-radius: 8px;
+  border: 1px solid var(--border-color); background: rgba(14, 23, 38, 0.7);
+  color: var(--text-secondary); cursor: pointer; font-size: 12px;
+  opacity: 0; transition: opacity .15s;
+}
+.message.bot:hover .msg-copy, .msg-copy:focus-visible, .msg-copy.ok { opacity: 1; }
+.msg-copy.ok { color: var(--success); border-color: var(--success); }
+@media (hover: none) { .msg-copy { opacity: .75; } }
+.message.bot .msg-bubble { padding-right: 40px; }
+.error-banner .retry-btn {
+  margin-left: auto; padding: 6px 12px; border-radius: 8px; cursor: pointer;
+  border: 1px solid rgba(252, 165, 165, 0.5); background: transparent; color: #FCA5A5;
+  font: inherit; font-size: .9em; white-space: nowrap;
+}
+.error-banner .retry-btn:hover { background: rgba(252, 165, 165, 0.12); }
+@media (pointer: coarse) {
+  .subcomando, .guide-example, .guide-filter-btn, .topbar-btn, .tablero { min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important; animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important; scroll-behavior: auto !important;
+  }
+  .particula, .particle, #particulas, .particles { display: none !important; }
+}
 </style>
 </head>
 <body class="notranslate" translate="no">
@@ -1707,7 +1758,7 @@ body.girly-mode .typing span { background: #BA8FFF; }
     <!-- Chat frame -->
     <div class="chat-frame">
       <div class="chat-main" id="chat-main">
-        <div class="chat-container" id="chat-container">
+        <div class="chat-container" id="chat-container" role="log" aria-live="polite" aria-relevant="additions" aria-label="Conversación con el bot">
           <div class="welcome-card" id="welcome-card">
             <div class="welcome-avatar"><i class="fas fa-robot"></i></div>
             <div class="welcome-title">¿En qué puedo ayudarte?</div>
@@ -1752,7 +1803,7 @@ body.girly-mode .typing span { background: #BA8FFF; }
               <button class="tablero" onclick="abrirCategoria('hojas')">
                 <div class="tablero-icon">📚</div>
                 <div class="tablero-titulo">Hojas</div>
-                <div class="tablero-sub">Site Sheet · Venta Diaria</div>
+                <div class="tablero-sub">Todas las pestañas de Site Sheet</div>
               </button>
             </div>
 
@@ -2326,6 +2377,7 @@ function generarParticulas() {
    LIVE CLOCK
    ============================================================ */
 function actualizarReloj() {
+  if (document.hidden) return;
   const ahora = new Date();
   const t = ahora.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
   const el = document.getElementById('live-time');
@@ -2497,7 +2549,7 @@ function sanitizeBotHtml(html) {
   let safe = escapeHtml(html);
   safe = safe
     .replace(/&lt;(\/?(?:b|strong|i|em|u|s|code|pre|br))&gt;/gi, '<$1>')
-    .replace(/&lt;a\s+href=&quot;([^&"]*)&quot;&gt;/gi, '<a href="$1" target="_blank" rel="noopener">')
+    .replace(/&lt;a\s+href=&quot;((?:https?:\/\/|mailto:|tel:)[^&"]*)&quot;&gt;/gi, '<a href="$1" target="_blank" rel="noopener noreferrer">')
     .replace(/&lt;\/a&gt;/gi, '</a>');
   return safe;
 }
@@ -2567,7 +2619,18 @@ function addBotMessage(html) {
   msg.className = 'message bot';
   msg.innerHTML =
     '<div class="msg-avatar"><i class="fas fa-robot"></i></div>' +
-    '<div class="msg-bubble">' + sanitizeBotHtml(html) + '</div>';
+    '<div class="msg-bubble">' + sanitizeBotHtml(html) +
+    '<button type="button" class="msg-copy" aria-label="Copiar respuesta" title="Copiar"><i class="fas fa-copy"></i></button></div>';
+  const bCopiar = msg.querySelector('.msg-copy');
+  bCopiar.addEventListener('click', function () {
+    const burbuja = msg.querySelector('.msg-bubble');
+    const clon = burbuja.cloneNode(true);
+    const x = clon.querySelector('.msg-copy'); if (x) x.remove();
+    const txt = (clon.innerText || clon.textContent || '').trim();
+    const listo = function () { bCopiar.classList.add('ok'); bCopiar.innerHTML = '<i class="fas fa-check"></i>'; setTimeout(function () { bCopiar.classList.remove('ok'); bCopiar.innerHTML = '<i class="fas fa-copy"></i>'; }, 1400); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(listo).catch(function () {});
+    else { const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); listo(); } catch (e) {} ta.remove(); }
+  });
   chatContainer.appendChild(msg);
   scrollToBottom();
 }
@@ -2588,10 +2651,17 @@ function removeTypingIndicator() {
   if (t) t.remove();
 }
 
-function addErrorBanner(errMsg) {
+function addErrorBanner(errMsg, reintentar) {
   const banner = document.createElement('div');
   banner.className = 'error-banner';
+  banner.setAttribute('role', 'alert');
   banner.innerHTML = '<i class="fas fa-circle-exclamation"></i><span>' + escapeHtml(errMsg) + '</span>';
+  if (reintentar) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'retry-btn'; b.textContent = 'Reintentar';
+    b.addEventListener('click', function () { banner.remove(); reintentar(); });
+    banner.appendChild(b);
+  }
   chatContainer.appendChild(banner);
   scrollToBottom();
 }
@@ -2599,31 +2669,46 @@ function addErrorBanner(errMsg) {
 /* ============================================================
    LLAMADA AL BOT
    ============================================================ */
-async function sendMessage(text) {
+async function sendMessage(text, esReintento) {
   if (!text || !text.trim()) return;
   text = text.trim();
 
   cerrarSidebarSiMobile();
-  addUserMessage(text);
+  if (!esReintento) addUserMessage(text);
   messageInput.value = '';
   autoResize();
   sendBtn.disabled = true;
   statusText.textContent = 'Procesando...';
 
   addTypingIndicator();
+  const reintentar = function () { sendMessage(text, true); };
 
+  const ctl = new AbortController();
+  const corte = setTimeout(function () { ctl.abort(); }, 60000);
   try {
+    if (!navigator.onLine) throw new Error('sin-red');
+    const headers = { 'Content-Type': 'application/json' };
+    let pin = ''; try { pin = localStorage.getItem('em-bot-pin') || ''; } catch (e) {}
+    if (pin) headers['X-Access-Token'] = pin;
+
     const r = await fetch(WORKER_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: headers, signal: ctl.signal,
       body: JSON.stringify({ message: text, session: SESSION_ID, user: 'Web' })
     });
 
     removeTypingIndicator();
 
+    if (r.status === 401) {
+      try { localStorage.removeItem('em-bot-pin'); } catch (e) {}
+      const nuevo = window.prompt('Este bot pide PIN. Escríbelo para entrar:');
+      if (nuevo) { try { localStorage.setItem('em-bot-pin', nuevo.trim()); } catch (e) {} reintentar(); }
+      else addErrorBanner('Hace falta el PIN para usar el bot.', reintentar);
+      return;
+    }
+    if (r.status === 429) { addErrorBanner('Muchas consultas seguidas. Espera un minuto y reintenta.', reintentar); return; }
     if (!r.ok) {
-      const errText = await r.text().catch(() => '');
-      addErrorBanner('Error ' + r.status + (errText ? ': ' + errText.slice(0, 200) : ''));
+      let msg = ''; try { const j = await r.json(); msg = j.error || ''; } catch (e) {}
+      addErrorBanner(msg || ('El bot no respondió (error ' + r.status + ').'), reintentar);
       return;
     }
 
@@ -2637,8 +2722,12 @@ async function sendMessage(text) {
     }
   } catch (e) {
     removeTypingIndicator();
-    addErrorBanner('No se pudo conectar con el bot: ' + e.message);
+    const msg = e.name === 'AbortError' ? 'El bot tardó más de 60 segundos. Reintenta o acota la consulta.'
+              : e.message === 'sin-red' ? 'Sin conexión a internet.'
+              : 'No se pudo conectar con el bot.';
+    addErrorBanner(msg, reintentar);
   } finally {
+    clearTimeout(corte);
     sendBtn.disabled = false;
     statusText.textContent = 'En línea';
     if (window.innerWidth > 768) messageInput.focus();
@@ -2911,6 +3000,9 @@ function mostrarGuia(id) {
    INIT
    ============================================================ */
 window.addEventListener('load', () => {
+  document.querySelectorAll('button').forEach(function (b) {
+    if (!b.getAttribute('aria-label') && !b.textContent.trim() && b.title) b.setAttribute('aria-label', b.title);
+  });
   generarParticulas();
   aplicarGirlyGuardado();
   actualizarReloj();

@@ -143,14 +143,14 @@ echo.
 echo   %ROJO%x  POSIBLE CREDENCIAL - no se subio nada%FIN%
 echo      Borra el archivo que te senala arriba y repite.
 echo.
-pause
+call :LOGO
 exit /b 1
 
 :VACIO
 echo.
 echo   %ROJO%x  FALTA worker\src\index.js - no se subio nada%FIN%
 echo.
-pause
+call :LOGO
 exit /b 1
 
 :SINTAXIS
@@ -159,7 +159,7 @@ del "%TEMP%\chk_n.txt" >nul 2>&1
 echo.
 echo   %ROJO%x  EL WORKER NO COMPILA - no se subio nada%FIN%
 echo.
-pause
+call :LOGO
 exit /b 1
 
 :SINSESION
@@ -167,7 +167,7 @@ echo.
 echo   %ROJO%x  SIN SESION DE CLOUDFLARE - no se subio nada%FIN%
 echo      Corre 1-INSTALAR-WRANGLER.bat
 echo.
-pause
+call :LOGO
 exit /b 1
 
 :NOSIRVE
@@ -180,7 +180,7 @@ echo.
 echo   %ROJO%x  CLOUDFLARE NO ESTA SIRVIENDO %WORKER_VERSION%%FIN%
 echo      Repite el bat; si sigue, manda este texto a Claude.
 echo.
-pause
+call :LOGO
 exit /b 1
 
 :NOGIT
@@ -188,7 +188,7 @@ echo.
 echo   %ROJO%x  NO ENCUENTRO GIT%FIN%
 echo      Instala GitHub Desktop o Git para Windows
 echo.
-pause
+call :LOGO
 exit /b 1
 
 :ADDFAIL
@@ -198,7 +198,7 @@ echo.
 echo   %ROJO%x  FALLO GIT ADD - no se subio a GitHub%FIN%
 echo      Cierra otras ventanas de git y repite
 echo.
-pause
+call :LOGO
 exit /b 1
 
 :COMMITFAIL
@@ -208,7 +208,7 @@ echo.
 echo   %ROJO%x  FALLO EL COMMIT - no se subio a GitHub%FIN%
 echo      Cierra otras ventanas de git y repite
 echo.
-pause
+call :LOGO
 exit /b 1
 
 :PUSHFAIL
@@ -218,29 +218,29 @@ echo.
 findstr /I /C:"Internal Server Error" /C:"HTTP 500" /C:"HTTP 502" /C:"HTTP 503" "%TEMP%\chk_push.txt" >nul 2>&1
 if not errorlevel 1 (
     echo      Es GitHub, no tu: su servidor contesto con un error interno.
-    echo      %VERDE%Espera unos minutos y repite este mismo bat.%FIN%
+    echo      Espera unos minutos y repite este mismo bat.
     goto PUSHFAIL_FIN
 )
 findstr /I /C:"non-fast-forward" /C:"fetch first" /C:"behind" "%TEMP%\chk_push.txt" >nul 2>&1
 if not errorlevel 1 (
     echo      GitHub tiene cambios que no estan en esta computadora.
-    echo      %VERDE%Corre 0-ACTUALIZAR.bat y repite este bat.%FIN%
+    echo      Corre 0-ACTUALIZAR.bat y repite este bat.
     goto PUSHFAIL_FIN
 )
 findstr /I /C:"Authentication failed" /C:"could not read Username" /C:"Permission denied" "%TEMP%\chk_push.txt" >nul 2>&1
 if not errorlevel 1 (
     echo      GitHub no te reconocio ^(sesion o permisos^).
-    echo      %VERDE%Abre GitHub Desktop, inicia sesion y repite.%FIN%
+    echo      Abre GitHub Desktop, inicia sesion y repite.
     goto PUSHFAIL_FIN
 )
 echo      Lo que contesto GitHub:
 echo.
 type "%TEMP%\chk_push.txt" 2>nul
 echo.
-echo      %VERDE%Manda este texto a Claude para que lo revise.%FIN%
+echo      Manda este texto a Claude para que lo revise.
 :PUSHFAIL_FIN
 echo.
-pause
+call :LOGO
 exit /b 1
 
 :NOCUADRA
@@ -248,7 +248,7 @@ echo.
 echo   %ROJO%x  GITHUB NO QUEDO IGUAL QUE TU CARPETA%FIN%
 echo      Repite el bat; si sigue, corre 0-ACTUALIZAR.bat
 echo.
-pause
+call :LOGO
 exit /b 1
 
 :BUSCARGIT
