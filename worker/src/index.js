@@ -14,7 +14,7 @@
 // Sello de version. El GET de la raiz lo devuelve y 5-SUBIR-TODO.bat lo
 // compara contra WORKER_VERSION de _config.bat: asi el verde solo sale si
 // Cloudflare de verdad esta sirviendo este codigo y no el anterior.
-const BOT_VERSION    = 'v8.9';
+const BOT_VERSION    = 'v8.10';
 
 let TELEGRAM_API     = '';     // se arma en cargarEnv() con env.TELEGRAM_TOKEN
 let GOOGLE_SA        = null;   // env.GOOGLE_SA_JSON parseado (cuenta de servicio)
@@ -302,6 +302,16 @@ async function router(chatId, texto, nombre, env) {
     return r.replace(/\s+/g,' ').trim();
   }
 
+  // ── FUNCIONES DEL MENÚ DEL SHEET (v8.10) ───────────────────────────
+  // "funciones" · "funciones killers" · "ejecuta 12" · "confirmar 85" · "estado corrida" · "probar funciones"
+  // Va antes que AYUDA para que "menu sheet" y "funciones" no caigan en la ayuda general.
+  if (/^(funciones?|acciones?)(\s|$)/.test(tNorm) || /^menu\s+(del\s+)?(sheet|site)\b/.test(tNorm) ||
+      /^(ejecuta|ejecutar|corre|correr|confirmar|confirmo)(\s|$)/.test(tNorm) ||
+      /^(estado|resultado)\s+(de\s+)?(la\s+)?(ultima\s+)?(corrida|funcion|tarea)\b/.test(tNorm) ||
+      /^(probar|prueba|diagnostico)\s+(funciones|menu|conexion)\b/.test(tNorm)) {
+    await cmdFuncionesSheet_(chatId, texto, env); return;
+  }
+
   // ── AYUDA / COMANDOS — debe ir AL INICIO antes que cualquier otro patrón
   // para que "ayuda" no caiga a la IA ni al inventario. Atrapa muchas
   // variantes: "ayuda", "lista de comandos", "ver comandos", "todos los
@@ -442,7 +452,7 @@ async function router(chatId, texto, nombre, env) {
   const COMANDOS_CONOCIDOS = [
     'ayuda','comandos','stock','venta','ventas','precio','precios',
     'sobreventa','killers','killer','sku','hojas','hoja','buscar',
-    'cancelaciones','republicar','casos','traslados','parrilla','parrillas','oportunidades','promociones','comisiones','variantes','comparar','bloqueados','publicaciones','autorizaciones','restricciones','historico','columnas','kams','correo','choferes','camionetas','recoleccion','resumen'
+    'cancelaciones','republicar','casos','traslados','parrilla','parrillas','oportunidades','promociones','comisiones','variantes','comparar','bloqueados','publicaciones','autorizaciones','restricciones','historico','columnas','kams','correo','choferes','camionetas','recoleccion','resumen','funciones','ejecutar','confirmar'
   ];
   const palabras1 = tNorm.split(/\s+/);
   const primeraP = palabras1[0] || '';
@@ -1509,6 +1519,12 @@ async function ayuda(chatId, nombre) {
     '🧩 <code>parrilla audio</code> (también computacion, tv, fotografia…) · 💡 <code>oportunidades</code> · 🔗 <code>edi</code> · 🧬 <code>variantes</code>\n'+
     '🔁 <code>cambio walmart</code> · 🎁 <code>promociones</code> · 💰 <code>comisiones</code> · 🏷️ <code>catalogo cva</code> · 🔒 <code>bloqueados</code>\n'+
     '<i>Todos aceptan palabras para filtrar:</i> <code>cancelaciones sobreventa</code> · <code>casos por abrir</code>\n\n'+
+    '<b>⚙️ FUNCIONES DEL MENÚ SITE SHEET</b> <i>(las 142 opciones del menú del Sheet, desde aquí)</i>\n'+
+    '<code>funciones</code> — lista por familia (🔥 killers, 💲 precios, 📈 ventas, 🚚 logística…) · <code>funciones killers</code> · <code>funciones buscar salud</code>\n'+
+    '<code>ejecuta 12</code> · <code>ejecuta salud del sheet</code> — corre una opción · <code>confirmar 85</code> — las ⚠️ lo piden antes\n'+
+    '<code>ejecuta 40 con 2026-10</code> — si una opción pide un dato · <code>estado corrida</code> — resultado de la última\n'+
+    '<code>funciones verificar</code> — compara esta lista con el Sheet en vivo · <code>probar funciones</code> — prueba inocua\n'+
+    '<i>Credenciales y envíos con ventana de PRUEBA se quedan en el Sheet (el bot te dice dónde).</i>\n\n'+
     '<b>📚 CUALQUIER PESTAÑA</b> <i>(los dos libros)</i>\n'+
     '<code>hojas</code> — lista de pestañas consultables\n'+
     '<code>hoja killers activos vigente</code> — filas de una pestaña con filtro\n'+
@@ -1527,6 +1543,415 @@ async function ayuda(chatId, nombre) {
     '• <b>dd/mm/yyyy - dd/mm/yyyy</b> para rangos de fechas\n'+
     '• Sin acentos ni mayúsculas obligatorios · comas para varios términos'
   );
+}
+
+
+// ============================================================
+// FUNCIONES DEL MENÚ SITE SHEET (v8.10)
+// ============================================================
+// SITE_MENU_ es una copia EXACTA del menú SITE SHEET del Sheet (onOpen de Setup.gs): 142 opciones, mismo orden,
+// mismas etiquetas y funciones. Se generó leyendo ese código, no se inventó nada. Para comprobar que sigue igual
+// que el Sheet en vivo: "funciones verificar" (compara contra la lista que devuelve Apps Script).
+// Fila: [sección, etiqueta, función, modo (o=directo, c=confirmar, s=solo en el Sheet), motivo (s,e,v,r)].
+const SITE_MENU_ = [
+  ["","💲 Actualizar precios y killers (todo en orden)","actualizarPreciosTodo","o",""],
+  ["🔥 Killers","📋 Actualizar parrillas por KAM","parrillasActualizar","o",""],
+  ["🔥 Killers","⬇️ Bajar killers del site (y recalcular todo)","killersBajarYRecalcular","o",""],
+  ["🔥 Killers › 🎯 Killers activos y Comparar Walmart","🔄 Actualizar Killers activos y Comparar Walmart","killersActivosActualizar","o",""],
+  ["🔥 Killers › 🎯 Killers activos y Comparar Walmart","🎚️ Bandas de Comparar Walmart (DEJAR / REVISAR KAM)","compararBandas","o",""],
+  ["🔥 Killers › ✉️ Envíos a KAMs","1 · Solicitud del mes (todo)","solicitudKillersEnviar","s","e"],
+  ["🔥 Killers › ✉️ Envíos a KAMs","2 · Nuevos + faltantes (sin killer)","nuevosKillersEnviar","s","e"],
+  ["🔥 Killers › ✉️ Envíos a KAMs","3 · SOLO los nuevos","soloNuevosKillersEnviar","s","e"],
+  ["🔥 Killers › ✉️ Envíos a KAMs","4 · Bajo mínimo","kcEnviar","s","e"],
+  ["🔥 Killers › ✉️ Envíos a KAMs","🔎 Revisar correos de killers enviados","killersRevisarEnviados","o",""],
+  ["🔥 Killers › ✉️ Envíos a KAMs","✅ Verificar envíos en Gmail (columna en Envios killers)","kvVerificarMenu","o",""],
+  ["🔥 Killers › 📉 Bajo mínimo","📊 Calcular killers bajo mínimo","kdBajar","o",""],
+  ["🔥 Killers › 📉 Bajo mínimo","📋 Actualizar hoja Correo","kcActualizar","o",""],
+  ["🔥 Killers › 📉 Bajo mínimo","📄 Archivo de promociones para el site","promosArchivoWalmart","o",""],
+  ["💲 Precios","📤 Actualizar EXPORTAR, MINIMO y MAXIMO","exportarPreciosWalmart","o",""],
+  ["💲 Precios","🔍 Revisar precios erróneos de ventas Walmart","preciosErroneosRevisar","o",""],
+  ["💲 Precios › 🏷 Cambio de precios (pasos 1 a 5)","1 · 🆕 Nuevo cambio","wmNuevoCambio","s","v"],
+  ["💲 Precios › 🏷 Cambio de precios (pasos 1 a 5)","1b · 📋 Pegar SKUs","wmPegarSkus","s","v"],
+  ["💲 Precios › 🏷 Cambio de precios (pasos 1 a 5)","2 · ✅ Marcar lo filtrado","wmMarcarFiltrados","s","v"],
+  ["💲 Precios › 🏷 Cambio de precios (pasos 1 a 5)","2 · 🔤 Marcar por texto","wmMarcarPorTexto","o",""],
+  ["💲 Precios › 🏷 Cambio de precios (pasos 1 a 5)","2 · ☑️ Marcar todo","wmMarcarTodo","o",""],
+  ["💲 Precios › 🏷 Cambio de precios (pasos 1 a 5)","2 · ⬜ Desmarcar todo","wmDesmarcarTodo","o",""],
+  ["💲 Precios › 🏷 Cambio de precios (pasos 1 a 5)","3 · ✖️ Aplicar factor de precio","wmAplicarFactor","c",""],
+  ["💲 Precios › 🏷 Cambio de precios (pasos 1 a 5)","4 · 📅 Aplicar fechas","wmAplicarFechas","c",""],
+  ["💲 Precios › 🏷 Cambio de precios (pasos 1 a 5)","5 · 📄 GENERAR ARCHIVO WALMART","wmGenerarArchivo","s","v"],
+  ["📈 Ventas","🗃️ Bajar histórico de ventas Walmart (site)","ventasHistoricoBajar","o",""],
+  ["📈 Ventas","📈 Bajar ventas 30 dias","ventas30Bajar","o",""],
+  ["📈 Ventas › 💰 Venta total y killers (resumen del mes)","💰 Actualizar ventas con killer","ventasKillersActualizar","o",""],
+  ["📈 Ventas › 💰 Venta total y killers (resumen del mes)","🔁 Rehacer un mes cerrado","ventasKillersRehacerMes","s","v"],
+  ["📈 Ventas › 🟣 Ventas CVA","🟣 Bajar ventas CVA (Odoo)","ventasCvaBajar","o",""],
+  ["📈 Ventas › 🟣 Ventas CVA","✉️ Mandar correo CVA pendiente","ventasCvaCorreoAhora","c",""],
+  ["📈 Ventas › 🧩 Combos","1 · Armar / actualizar candidatos (misma categoría)","combosCandidatosActualizar","o",""],
+  ["📈 Ventas › 🧩 Combos","2 · Pasar los SI a depurados (para el site)","combosDepurar","c",""],
+  ["🚫 Pedidos y casos","🔎 Consultar pedidos (site + guías)","cpConsultar","o",""],
+  ["🚫 Pedidos y casos","🌐 Abrir rastreo de todos los pedidos","cpAbrirTodos","o",""],
+  ["🚫 Pedidos y casos","💸 Bajar cobro distinto","cobroDistintoBajar","o",""],
+  ["🚫 Pedidos y casos","📂 Casos Walmart (revisar)","casosWalmartRevisar","o",""],
+  ["🚫 Pedidos y casos","📝 Casos: decidir y generar textos","casosDecidirMenu","o",""],
+  ["🚫 Pedidos y casos","📬 Pedidos en riesgo (revisar)","pedidosRiesgoRevisar","o",""],
+  ["🚫 Pedidos y casos › 📦 Sobreventa","📦 Revisar sobreventa (Walmart)","revisarSobreventa","o",""],
+  ["🚫 Pedidos y casos › 📦 Sobreventa","👁 Ver qué cancelaría la sobreventa","cancelacionesSobreventaVer","o",""],
+  ["🚫 Pedidos y casos › 📦 Sobreventa","❌ Cancelar en Odoo las marcadas de sobreventa","cancelacionesSobreventaMarcadas","c",""],
+  ["🚫 Pedidos y casos › ❌ Cancelaciones","📥 Leer cancelaciones del correo","cancelacionesBajar","o",""],
+  ["🚫 Pedidos y casos › ❌ Cancelaciones","📋 Pendientes de cancelar en el site","cancelacionesPendientesSite","o",""],
+  ["🚫 Pedidos y casos › ❌ Cancelaciones","🧾 Verificar cancelaciones en Odoo","cancelacionesVerificarOdoo","o",""],
+  ["🚫 Pedidos y casos › ❌ Cancelaciones › ⚙️ Configurar","🔑 Guardar PIN y quién cancela","cancelacionesGuardarPin","s","s"],
+  ["🚫 Pedidos y casos › ❌ Cancelaciones › ⚙️ Configurar","⏱️ Activar cancelaciones automáticas","cancelacionesActivarTrigger","c",""],
+  ["🚫 Pedidos y casos › ❌ Cancelaciones › ⚙️ Configurar","🎨 Formato de cancelaciones","cancelacionesFormato","o",""],
+  ["🚫 Pedidos y casos › ❌ Cancelaciones › ⚙️ Configurar","↔️ Ordenar columnas de cancelaciones","cancelacionesOrdenarColumnas","o",""],
+  ["🚫 Pedidos y casos › 📄 Plantillas de caso Walmart","1 · Llenar datos (pedido o SKU)","plantillasCasoLlenar","o",""],
+  ["🚫 Pedidos y casos › 📄 Plantillas de caso Walmart","2 · Descargar: no se generó la guía","plantillasCasoSinGuia","o",""],
+  ["🚫 Pedidos y casos › 📄 Plantillas de caso Walmart","3 · Descargar: publicado y no visible (cualquier problema de publicación)","plantillasCasoNoVisible","o",""],
+  ["🏬 Catálogo Walmart","⬇️ Bajar catálogo de Walmart","wmWalmartBajar","o",""],
+  ["🏬 Catálogo Walmart","🔁 Actualizar hoja Republicar","republicarActualizar","o",""],
+  ["🏬 Catálogo Walmart › ⬇️ Bajar del site (corre solo cada hora)","🏷️ Bajar promociones del site","promosBajar","o",""],
+  ["🏬 Catálogo Walmart › ⬇️ Bajar del site (corre solo cada hora)","💰 Bajar comisiones del site","comisionesBajar","o",""],
+  ["🏬 Catálogo Walmart › ⬇️ Bajar del site (corre solo cada hora)","📦 Bajar catalogo CVA","cvaCatalogoBajar","o",""],
+  ["🏬 Catálogo Walmart › 📋 Walmart EDI","📋 Bajar lista Walmart EDI","ediBajar","o",""],
+  ["🏬 Catálogo Walmart › 📋 Walmart EDI","🔀 Cruzar EDI vs Bloqueados","cruzarEdiBloqueados","o",""],
+  ["🏬 Catálogo Walmart › 🧾 Listas para Walmart","📦 GTINs para convertir a WFS","wmGtinsParaConvertir","o",""],
+  ["🏬 Catálogo Walmart › 🧾 Listas para Walmart","🚫 Productos inactivos","wmProductosInactivos","o",""],
+  ["🏬 Catálogo Walmart › 🧾 Listas para Walmart","🧹 Publicaciones viejas a dar de baja","resParaDesactivar","o",""],
+  ["🏬 Catálogo Walmart › 🧬 Concentrado y variantes","🧱 Armar Concentrado","armarConcentrado","o",""],
+  ["🏬 Catálogo Walmart › 🧬 Concentrado y variantes","🧬 Armar Variantes","armarVariantes","o",""],
+  ["🏬 Catálogo Walmart › 🧬 Concentrado y variantes","🔗 Asignar variante a mano","asignarVariante","s","v"],
+  ["🏬 Catálogo Walmart › 🧬 Concentrado y variantes","💰 Buscar oportunidades","armarOportunidades","o",""],
+  ["🚚 Logística › 🚚 Envíos WFS","📥 Actualizar ventas y calcular","wfsActualizarMenu","o",""],
+  ["🚚 Logística › 🚚 Envíos WFS","▶ Calcular envío WFS (sin traer ventas)","wfsCalcularMenu","o",""],
+  ["🚚 Logística › 🚚 Envíos WFS","🚚 Nuevo envío (hoja ENVIO)","wfsNuevoEnvio","s","v"],
+  ["🚚 Logística › 🚚 Envíos WFS","✏️ Cambiar choferes y camionetas de un envío","wfsCambiarChoferes","s","v"],
+  ["🚚 Logística › 🚚 Envíos WFS","📤 Copia para autorización","wfsAutorizaCopia","s","e"],
+  ["🚚 Logística › 🚚 Envíos WFS","📥 Traer autorizado","wfsAutorizaTraer","s","e"],
+  ["🚚 Logística › 🚚 Envíos WFS","📦 Crear traslado en Odoo (envío autorizado)","wfsTrasladoOdoo","s","e"],
+  ["🚚 Logística › 🚚 Envíos WFS","📄 Archivo para importar el envío en Odoo","wfsArchivoImportarOdoo","o",""],
+  ["🚚 Logística › 🚚 Envíos WFS","📄 Plantilla de Walmart (WFS)","wfsPlantillaWalmart","s","e"],
+  ["🚚 Logística › 🚚 Envíos WFS","📑 PDF del envío (CATEGORIA, NOMBRE, SKU, AUTORIZADO, GTIN)","wfsPdfEnvio","o",""],
+  ["🚚 Logística › 🚚 Envíos WFS","🗄 Archivar envíos y limpiar","wfsArchivarEnvios","c",""],
+  ["🚚 Logística › 🚚 Envíos WFS › 🧰 Herramientas WFS","🗑 Quitar copias sobrantes","wfsAutorizaHuerfanas","s","v"],
+  ["🚚 Logística › 🚚 Envíos WFS › 🧰 Herramientas WFS","🚫 Restricciones WFS","wfsRestricciones","o",""],
+  ["🚚 Logística › 🚚 Envíos WFS › 🧰 Herramientas WFS","📊 Ver estado de WFS","wfsVerEstado","o",""],
+  ["🚚 Logística › 🚚 Envíos WFS › 🧰 Herramientas WFS","⏰ Encender cálculo automático (cada hora)","wfsEncenderAuto","c",""],
+  ["🚚 Logística › 🚚 Envíos WFS › 🧰 Herramientas WFS","🛑 Apagar cálculo automático","wfsApagarAuto","c",""],
+  ["🚚 Logística › 🚛 Recolección Walmart","📊 Estado (envío diario y formulario)","recMenuEstado","o",""],
+  ["🚚 Logística › 🚛 Recolección Walmart","🧪 Probar sin enviar","recMenuProbar","o",""],
+  ["🚚 Logística › 🚛 Recolección Walmart","📨 Enviar ahora","recMenuEnviarAhora","c",""],
+  ["🚚 Logística › 🚛 Recolección Walmart","📅 Pedir para otra fecha…","recMenuOtraFecha","s","e"],
+  ["🚚 Logística › 🚛 Recolección Walmart","▶️ Instalar envío diario (L-V 7am)","recMenuInstalar","c",""],
+  ["🚚 Logística › 🚛 Recolección Walmart","🛑 Quitar envío diario","recMenuQuitar","c",""],
+  ["🧾 Cotizaciones","🆕 Nueva cotización","cotNueva","s","v"],
+  ["🧾 Cotizaciones","🔎 Buscar productos","cotBuscar","s","v"],
+  ["🧾 Cotizaciones","📄 Generar cotización","cotGenerar","o",""],
+  ["🧾 Cotizaciones","📚 Abrir historial","cotAbrirHistorial","o",""],
+  ["🧾 Cotizaciones","🧩 Reglas de búsqueda","cotReglas","o",""],
+  ["🧾 Cotizaciones","🔗 Usar otro libro de historial","cotCambiarHistorial","c",""],
+  ["🩺 Salud y diagnóstico","🩺 Salud del Sheet","saludMenu","o",""],
+  ["🩺 Salud y diagnóstico","📋 Reporte del día (hoja)","reporteMenu","o",""],
+  ["🩺 Salud y diagnóstico","🧪 Probar conexión","uiProbar","o",""],
+  ["🩺 Salud y diagnóstico","👁 Ver qué está configurado","uiEstado","o",""],
+  ["🩺 Salud y diagnóstico","📊 Consumo de UrlFetch hoy","uiConsumo","o",""],
+  ["🩺 Salud y diagnóstico","♻️ Reintentar tras cuota agotada","limpiarFlagCuota","o",""],
+  ["🩺 Salud y diagnóstico","🔑 Probar credenciales de killers","killersProbarCredenciales","o",""],
+  ["🩺 Salud y diagnóstico","🧭 Revisar columnas de todas las hojas","revisarColumnas","o",""],
+  ["🩺 Salud y diagnóstico › 🔍 Revisiones de datos","🔍 Revisar Concentrado","revisarConcentrado","o",""],
+  ["🩺 Salud y diagnóstico › 🔍 Revisiones de datos","🔍 Revisar variantes","revisarVariantes","o",""],
+  ["🩺 Salud y diagnóstico › 🔍 Revisiones de datos","🔍 Revisar triggers de esta cuenta","revisarTriggers","o",""],
+  ["🩺 Salud y diagnóstico › 🔍 Revisiones de datos","🔍 SKUs del inventario que faltan en Odoo","revisarFaltantesEnCatalogo","o",""],
+  ["🩺 Salud y diagnóstico › 🔍 Revisiones de datos","🔍 Marcas y colores sin traducir","revisarSinTraducir","o",""],
+  ["🩺 Salud y diagnóstico › 🔍 Revisiones de datos","🔍 Revisar encabezados de las hojas","revisarEncabezados","o",""],
+  ["🩺 Salud y diagnóstico › 🔍 Revisiones de datos","🧬 Ver estructura de killers","killersVerEstructura","o",""],
+  ["⚙️ Configuración y mantenimiento › ⏱ Corridas automáticas","🔍 Ver triggers de este proyecto","verTriggers","o",""],
+  ["⚙️ Configuración y mantenimiento › ⏱ Corridas automáticas","▶️ Activar TODAS las corridas","instalarTriggers","c",""],
+  ["⚙️ Configuración y mantenimiento › ⏱ Corridas automáticas","🛑 Quitar corridas","uiQuitarTriggers","c",""],
+  ["⚙️ Configuración y mantenimiento › 📥 Históricos de una vez","📥 Traer septiembre y meses del archivo (una vez)","traerHistoricoSeptiembre","s","r"],
+  ["⚙️ Configuración y mantenimiento › 📥 Históricos de una vez","📥 Traer TODO de Venta Diaria (una vez)","ventaDiariaTraerTodo","s","r"],
+  ["⚙️ Configuración y mantenimiento › 🛠 Mantenimiento","🔄 Bajar TODO ahora","uiBajarTodo","o",""],
+  ["⚙️ Configuración y mantenimiento › 🛠 Mantenimiento","🗂️ Ordenar hojas e índice","orgOrdenar","c",""],
+  ["⚙️ Configuración y mantenimiento › 🛠 Mantenimiento","⬇️ Descargar una hoja como Excel","descargarHoja","o",""],
+  ["⚙️ Configuración y mantenimiento › 🛠 Mantenimiento","💲 Solo precios (6 hojas)","uiPrecios","o",""],
+  ["⚙️ Configuración y mantenimiento › 🛠 Mantenimiento","📦 Solo inventario","uiStock","o",""],
+  ["⚙️ Configuración y mantenimiento › 🛠 Mantenimiento","🗂 Bajar catálogo de Odoo","uiSincronizarCatalogo","o",""],
+  ["⚙️ Configuración y mantenimiento › 🛠 Mantenimiento","♻️ Rehacer hoja Walmart (forzado)","wmWalmartBajarForzado","c",""],
+  ["⚙️ Configuración y mantenimiento › 🛠 Mantenimiento","🧩 Rehacer hoja Inventarios","uiRehacerInventarios","c",""],
+  ["⚙️ Configuración y mantenimiento › 🛠 Mantenimiento","💥 Forzar rebajada completa","uiForzar","c",""],
+  ["⚙️ Configuración y mantenimiento › 🛠 Mantenimiento","🧹 Quitar respaldos y hojas viejas","limpiarHojasViejas","c",""],
+  ["⚙️ Configuración y mantenimiento › 🛠 Mantenimiento","🧹 Limpiar Log","uiLimpiarLog","c",""],
+  ["⚙️ Configuración y mantenimiento › 🌐 Site y extensión","🔑 Configurar token API","uiSetToken","s","s"],
+  ["⚙️ Configuración y mantenimiento › 🌐 Site y extensión","🔐 Login automático del site","uiSetLogin","s","s"],
+  ["⚙️ Configuración y mantenimiento › 🌐 Site y extensión","🔁 Renovar cookie ahora","uiRenovarCookie","o",""],
+  ["⚙️ Configuración y mantenimiento › 🌐 Site y extensión","🍪 Actualizar cookie a mano","uiSetCookie","s","s"],
+  ["⚙️ Configuración y mantenimiento › 🌐 Site y extensión","🧩 Clave de la extensión","uiClaveExtension","s","s"],
+  ["⚙️ Configuración y mantenimiento › 🌐 Site y extensión","✏️ Poner ruta de precios a mano","uiSetRutaPrecios","c",""],
+  ["⚙️ Configuración y mantenimiento › 🌐 Site y extensión","✏️ Poner ruta de killers a mano","killersRutaAMano","c",""],
+  ["⚙️ Configuración y mantenimiento › 🗄 Odoo","🗄 Conectar Odoo","uiConectarOdoo","s","s"],
+  ["⚙️ Configuración y mantenimiento › 🗄 Odoo","🔑 Guardar correo y contraseña de Odoo","uiOdooLogin","s","s"],
+  ["⚙️ Configuración y mantenimiento › 🗄 Odoo","🔐 Estado de la sesión de Odoo","odooEstadoSesion","o",""],
+  ["⚙️ Configuración y mantenimiento › 🗄 Odoo","🩺 Diagnóstico de permisos de Odoo","odooDiagnostico","o",""],
+  ["⚙️ Configuración y mantenimiento › 🗄 Odoo","🧹 Borrar correo y contraseña de Odoo","uiOdooLoginBorrar","s","s"],
+  ["⚙️ Configuración y mantenimiento › 📋 Este libro y avisos","🏬 Conectar Walmart Dashboard","wmDashboardConectar","s","s"],
+  ["⚙️ Configuración y mantenimiento › 📋 Este libro y avisos","📋 Capturar ID del Sheet","uiSetSheetId","c",""],
+  ["⚙️ Configuración y mantenimiento › 📋 Este libro y avisos","🔒 Password del dashboard","uiSetPassword","s","s"],
+  ["⚙️ Configuración y mantenimiento › 📋 Este libro y avisos","📧 Poner correo de avisos","uiSetCorreoAvisos","c",""],
+  ["⚙️ Configuración y mantenimiento › 📋 Este libro y avisos","🗑 Borrar TODAS las credenciales","uiBorrarTodo","s","s"]
+];
+const SITE_MOTIVOS_ = {
+  s: 'Pide o borra credenciales: se captura en el Sheet, nunca por el bot.',
+  e: 'Es un envío real (correo, Odoo o Walmart): se confirma en la ventana del Sheet, con PRUEBA primero y cuenta regresiva.',
+  v: 'Necesita tu selección o una ventana con opciones dentro de la hoja.',
+  r: 'Lee Venta Diaria Odoo, que ya se retiró: no se corre desde el bot.'
+};
+let _sfFilas = null;
+function sfLimpia_(s) {
+  return sinAcentos(String(s || '').toLowerCase()).replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+function sfFilas_() {
+  if (_sfFilas) return _sfFilas;
+  _sfFilas = SITE_MENU_.map(function (f, i) {
+    const fam = f[0] ? f[0].split(' › ')[0] : '⚡ Atajo diario';
+    return { n: i + 1, sec: f[0], fam: fam, etiqueta: f[1], fn: f[2],
+             modo: f[3] === 's' ? 'sheet' : (f[3] === 'c' ? 'confirmar' : 'ok'), motivo: SITE_MOTIVOS_[f[4]] || '',
+             clave: sfLimpia_(f[0] + ' ' + f[1] + ' ' + f[2]) };
+  });
+  return _sfFilas;
+}
+function sfFamilias_() {
+  const out = [];
+  sfFilas_().forEach(function (f) { if (out.indexOf(f.fam) < 0) out.push(f.fam); });
+  return out;
+}
+function sfIcono_(modo) { return modo === 'ok' ? '✅' : (modo === 'confirmar' ? '⚠️' : '🖥'); }
+function sfRuta_(f) { return 'SITE SHEET › ' + (f.sec ? f.sec + ' › ' : '') + f.etiqueta; }
+
+// ¿Quién puede MANDAR a correr algo en el Sheet? Listar es libre; correr no.
+//  · App web: solo con APP_PIN activo (el PIN ya se validó antes de llegar aquí).
+//  · Telegram: solo los chats de EJECUTA_CHATS (ids separados por coma; el id sale con /miid).
+function sfPuedeEjecutar_(chatId, env) {
+  if (String(chatId).indexOf('web:') === 0) return !!String(env.APP_PIN || '').trim();
+  const ok = String(env.EJECUTA_CHATS || '').split(/[\s,;]+/).filter(Boolean);
+  return ok.indexOf(String(chatId)) >= 0;
+}
+
+function sfBuscar_(consulta) {
+  const q = sfLimpia_(consulta);
+  if (!q) return [];
+  const filas = sfFilas_();
+  if (/^\d+$/.test(q)) { const n = filas.filter(function (f) { return f.n === Number(q); }); return n; }
+  const exacta = filas.filter(function (f) { return f.fn.toLowerCase() === String(consulta).trim().toLowerCase(); });
+  if (exacta.length) return exacta;
+  const pal = q.split(' ').filter(function (p) { return p.length > 0; });
+  let r = filas.filter(function (f) { return pal.every(function (p) { return f.clave.indexOf(p) >= 0; }); });
+  if (r.length > 1) {
+    const igual = r.filter(function (f) { return sfLimpia_(f.etiqueta) === q; });
+    if (igual.length === 1) return igual;
+  }
+  return r;
+}
+
+function sfLineas_(filas) {
+  let sec = null, t = '';
+  filas.forEach(function (f) {
+    const s = f.sec ? f.sec.split(' › ').slice(1).join(' › ') : '';
+    if (s !== sec) { sec = s; if (s) t += '\n<b>' + esc(s) + '</b>\n'; }
+    t += '<code>' + f.n + '</code> ' + sfIcono_(f.modo) + ' ' + esc(f.etiqueta) + '\n';
+  });
+  return t;
+}
+
+async function sfResumen_(chatId, env) {
+  const filas = sfFilas_();
+  const ok = filas.filter(function (f) { return f.modo === 'ok'; }).length;
+  const con = filas.filter(function (f) { return f.modo === 'confirmar'; }).length;
+  const hoja = filas.length - ok - con;
+  let t = '⚙️ <b>Funciones del menú SITE SHEET</b>\n<i>' + filas.length + ' opciones, copia exacta del menú del Sheet</i>\n\n' +
+    '✅ ' + ok + ' corren directo\n⚠️ ' + con + ' piden confirmar\n🖥 ' + hoja + ' solo se hacen en el Sheet (credenciales, envíos con ventana de PRUEBA, selección en la hoja)\n\n' +
+    '<b>Familias</b> <i>(escribe lo que va en el código)</i>\n';
+  sfFamilias_().forEach(function (fam) {
+    const n = filas.filter(function (f) { return f.fam === fam; }).length;
+    const key = fam === '⚡ Atajo diario' ? 'atajo' : sfLimpia_(fam).split(' ').slice(0, 2).join(' ');
+    t += '<code>funciones ' + esc(key) + '</code> — ' + esc(fam) + ' (' + n + ')\n';
+  });
+  t += '\n<b>Cómo correrlas</b>\n' +
+    '<code>ejecuta 12</code> o <code>ejecuta salud del sheet</code> — corre una opción\n' +
+    '<code>confirmar 85</code> — las ⚠️ piden esta palabra antes\n' +
+    '<code>ejecuta 40 con 2026-10</code> — si pide un dato, va después de <i>con</i>\n' +
+    '<code>estado corrida</code> — resultado de la última\n' +
+    '<code>funciones buscar texto</code> — busca por nombre\n' +
+    '<code>funciones verificar</code> — compara esta lista con el Sheet en vivo\n' +
+    '<code>probar funciones</code> — prueba inocua de la conexión\n';
+  if (!sfPuedeEjecutar_(chatId, env)) {
+    t += '\n🔒 <i>Aquí puedes ver la lista, pero correr opciones está apagado para este chat' +
+      (String(chatId).indexOf('web:') === 0 ? ' (activa el PIN de la app).' : ' (agrega tu id de <code>/miid</code> en EJECUTA_CHATS).') + '</i>';
+  }
+  await enviar(chatId, t);
+}
+
+// Llamada al Web App de Apps Script (Bot.gs). La clave nunca se escribe en mensajes ni en logs.
+async function sfLlamar_(env, cuerpo) {
+  const url = String(env.SITE_EXEC_URL || '').trim();
+  const clave = String(env.SITE_CLAVE || '').trim();
+  if (!url || !clave) return { ok: false, error: 'sin_config' };
+  if (!/^https:\/\/script\.google(usercontent)?\.com\//.test(url)) return { ok: false, error: 'url_no_valida' };
+  const ctl = new AbortController();
+  const to = setTimeout(function () { ctl.abort(); }, 22000);
+  try {
+    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(Object.assign({ clave: clave }, cuerpo)), signal: ctl.signal, redirect: 'follow' });
+    const txt = await r.text();
+    try { return JSON.parse(txt); } catch (e) { return { ok: false, error: 'respuesta_no_json', http: r.status }; }
+  } catch (e) {
+    return { ok: false, error: e && e.name === 'AbortError' ? 'tiempo_agotado' : 'sin_conexion' };
+  } finally { clearTimeout(to); }
+}
+
+function sfErrorTexto_(r) {
+  const e = String((r && r.error) || 'desconocido');
+  if (e === 'sin_config') return '🔌 Falta conectar el bot con el Sheet. En la carpeta <code>worker</code> corre <code>npx wrangler secret put SITE_EXEC_URL</code> (URL de la aplicación web de Apps Script, termina en <code>/exec</code>) y <code>npx wrangler secret put SITE_CLAVE</code> (la “Clave de la extensión” del menú ⚙️ Configuración › 🌐 Site y extensión). Las pega tú en esa ventana; no me las mandes por aquí.';
+  if (e === 'url_no_valida') return '🔌 SITE_EXEC_URL no parece una URL de Apps Script (debe empezar con https://script.google.com/).';
+  if (e === 'no_autorizado') return '🔑 El Sheet no aceptó la clave (SITE_CLAVE). Revisa que sea la “Clave de la extensión” vigente.';
+  if (e === 'bloqueado_espera_10_min') return '⏳ El Sheet bloqueó la clave 10 minutos por intentos fallidos. Espera y vuelve a probar.';
+  if (e === 'sin_clave_genera_en_el_menu') return '🔑 El Sheet todavía no tiene clave: en el menú ⚙️ Configuración y mantenimiento › 🌐 Site y extensión › 🧩 Clave de la extensión.';
+  if (e === 'tiempo_agotado' || e === 'sin_conexion') return '📡 El Sheet no contestó a tiempo. Puede estar ocupado; prueba de nuevo en un minuto.';
+  if (e === 'respuesta_no_json' || /^accion desconocida|^accion_bot_desconocida|sesion_invalida/.test(e)) return '🧩 El Sheet no conoce todavía esta función del bot: falta publicar el Site Sheet (su <code>5-SUBIR-TODO.bat</code>, que crea la versión nueva del Web App).';
+  if (e === 'no_esta_en_el_menu') return '🧩 El Sheet no tiene esa opción en su lista (¿menú cambiado?). Corre <code>funciones verificar</code>.';
+  if (e === 'la_funcion_no_existe') return '🧩 La opción está en la lista pero esa función no existe en el código publicado del Sheet. Publica el Site Sheet y reintenta.';
+  if (e === 'sin_activador') return '⏱ El Sheet no pudo programar la corrida (límite de activadores de Google): ' + esc(r.detalle || '');
+  return '❌ ' + esc(e) + (r && r.detalle ? ': ' + esc(r.detalle) : '');
+}
+
+function sfVista_(j) {
+  const icono = { en_cola: '⏳', corriendo: '⏳', ok: '✅', necesita: '⚠️', error: '❌' }[j.estado] || '•';
+  let t = icono + ' <b>' + esc(j.etiqueta) + '</b>';
+  if (j.estado === 'en_cola') t += '\n<i>En cola: el Sheet la arranca en unos segundos (Google programa el arranque, puede tardar hasta un minuto).</i>';
+  else if (j.estado === 'corriendo') t += '\n<i>Corriendo en el Sheet…</i>';
+  else t += (j.seg ? ' · ' + j.seg + ' s' : '');
+  const salida = String(j.salida || '').split('\n').filter(function (l) { return l.trim(); }).slice(0, 14);
+  if (salida.length) t += '\n\n' + salida.map(function (l) { return '▸ ' + esc(l.slice(0, 300)); }).join('\n');
+  if (j.retorno && String(j.salida || '').indexOf(String(j.retorno).slice(0, 60)) < 0) t += '\n\n' + esc(String(j.retorno).slice(0, 500));
+  (j.necesita || []).slice(0, 3).forEach(function (n) {
+    if (/^dato:/.test(n)) t += '\n\n⚠️ Pide un dato: <i>' + esc(n.slice(6)) + '</i>\nMándalo así: <code>ejecuta ' + esc(j.fn) + ' con &lt;dato&gt;</code>';
+    else if (/^dato sensible:/.test(n)) t += '\n\n🔒 ' + esc(n);
+    else if (/^pregunta:/.test(n)) t += '\n\n⚠️ Quiso preguntar y no se contestó solo: <i>' + esc(n.slice(10)) + '</i>\nSi quieres que la conteste el bot, usa <code>confirmar ' + esc(j.fn) + '</code>; si no, hazla en el Sheet.';
+    else t += '\n\n🖥 ' + esc(n);
+  });
+  if (j.error) t += '\n\n❌ ' + esc(j.error);
+  if (j.estado === 'ok' || j.estado === 'necesita' || j.estado === 'error') t += '\n\n<i>Todo quedó también en la hoja Log (etapa BOT).</i>';
+  return t;
+}
+
+async function sfEsperarResultado_(chatId, env, id) {
+  let j = null;
+  for (let i = 0; i < 7; i++) {
+    await new Promise(function (r) { setTimeout(r, 3000); });
+    const r = await sfLlamar_(env, { accion: 'bot_estado', job: id });
+    if (!r.ok) { await enviar(chatId, sfErrorTexto_(r)); return; }
+    j = r.job;
+    if (j.estado !== 'en_cola' && j.estado !== 'corriendo') break;
+  }
+  if (j && (j.estado === 'en_cola' || j.estado === 'corriendo')) {
+    await enviar(chatId, sfVista_(j) + '\n\nSigue en curso. Cuando termine: <code>estado corrida ' + esc(id) + '</code>');
+    return;
+  }
+  await enviar(chatId, sfVista_(j));
+}
+
+async function sfCorrer_(chatId, f, confirmado, entrada, env) {
+  if (!sfPuedeEjecutar_(chatId, env)) {
+    await enviar(chatId, '🔒 Correr opciones del Sheet está apagado para este chat. ' +
+      (String(chatId).indexOf('web:') === 0 ? 'Activa el PIN de la app (<code>wrangler secret put APP_PIN</code> en <code>worker</code>).' : 'Agrega tu id (<code>/miid</code>) en el secreto EJECUTA_CHATS.'));
+    return;
+  }
+  if (f.modo === 'sheet') {
+    await enviar(chatId, '🖥 <b>' + esc(f.etiqueta) + '</b> se hace en el Sheet.\n' + esc(f.motivo) + '\n\n📍 <code>' + esc(sfRuta_(f)) + '</code>');
+    return;
+  }
+  if (f.modo === 'confirmar' && !confirmado) {
+    await enviar(chatId, '⚠️ <b>' + esc(f.etiqueta) + '</b> cambia cosas (correos, Odoo, activadores, hojas o configuración).\n📍 <code>' + esc(sfRuta_(f)) + '</code>\n\nSi estás seguro: <code>confirmar ' + f.n + '</code>' + (entrada.length ? ' <code>con ' + esc(entrada.join('; ')) + '</code>' : ''));
+    return;
+  }
+  const r = await sfLlamar_(env, { accion: 'bot_ejecutar', fn: f.fn, confirmado: confirmado === true, entrada: entrada });
+  if (!r.ok) {
+    if (r.error === 'solo_desde_el_sheet') { await enviar(chatId, '🖥 <b>' + esc(f.etiqueta) + '</b> se hace en el Sheet.\n' + esc(r.motivo || f.motivo) + '\n\n📍 <code>' + esc(r.ruta || sfRuta_(f)) + '</code>'); return; }
+    if (r.error === 'falta_confirmar') { await enviar(chatId, '⚠️ Esa pide confirmación: <code>confirmar ' + f.n + '</code>'); return; }
+    if (r.error === 'ocupado') { await enviar(chatId, '⏳ Ya hay una corrida en curso (' + esc(r.etiqueta || '') + '). Espera a que termine: <code>estado corrida ' + esc(r.job || '') + '</code>'); return; }
+    await enviar(chatId, sfErrorTexto_(r)); return;
+  }
+  await enviar(chatId, '▶️ <b>' + esc(f.etiqueta) + '</b> enviada al Sheet (corrida <code>' + esc(r.job) + '</code>). Espero el resultado…');
+  await sfEsperarResultado_(chatId, env, r.job);
+}
+
+async function sfVerificar_(chatId, env) {
+  const r = await sfLlamar_(env, { accion: 'bot_menu' });
+  if (!r.ok) { await enviar(chatId, sfErrorTexto_(r)); return; }
+  const vivo = r.menu || [], mio = sfFilas_();
+  const clave = function (x) { return (x.sec || '') + '|' + x.etiqueta + '|' + x.fn; };
+  const a = {}, b = {};
+  vivo.forEach(function (x) { a[clave(x)] = 1; });
+  mio.forEach(function (x) { b[clave(x)] = 1; });
+  const faltanAqui = vivo.filter(function (x) { return !b[clave(x)]; });
+  const sobranAqui = mio.filter(function (x) { return !a[clave(x)]; });
+  if (!faltanAqui.length && !sobranAqui.length) {
+    await enviar(chatId, '✅ La lista del bot coincide con la del Sheet: ' + mio.length + ' opciones, mismas etiquetas y funciones.');
+    return;
+  }
+  let t = '⚠️ La lista del bot y la del Sheet ya no coinciden.\n';
+  if (faltanAqui.length) t += '\n<b>Nuevas en el Sheet</b> (' + faltanAqui.length + '):\n' + faltanAqui.slice(0, 8).map(function (x) { return '• ' + esc(x.etiqueta); }).join('\n');
+  if (sobranAqui.length) t += '\n\n<b>Ya no están en el Sheet</b> (' + sobranAqui.length + '):\n' + sobranAqui.slice(0, 8).map(function (x) { return '• ' + esc(x.etiqueta); }).join('\n');
+  t += '\n\nPídeme actualizar la lista del bot desde el menú del Sheet.';
+  await enviar(chatId, t);
+}
+
+async function cmdFuncionesSheet_(chatId, texto, env) {
+  const original = String(texto || '').trim();
+  const t = sfLimpia_(original);
+  // Estado de una corrida
+  let m = /^(?:estado|resultado)\s+(?:de\s+)?(?:la\s+)?(?:ultima\s+)?(?:corrida|funcion|tarea)\s*([a-z0-9]*)$/.exec(t);
+  if (m) {
+    if (!sfPuedeEjecutar_(chatId, env)) { await enviar(chatId, '🔒 Correr opciones del Sheet está apagado para este chat.'); return; }
+    const r = await sfLlamar_(env, { accion: 'bot_estado', job: m[1] || '' });
+    if (!r.ok) { await enviar(chatId, r.error === 'no_existe' ? 'ℹ️ No hay corridas registradas con ese número.' : sfErrorTexto_(r)); return; }
+    await enviar(chatId, sfVista_(r.job)); return;
+  }
+  // Prueba inocua
+  if (/^(probar|prueba|diagnostico)\s+(funciones|menu|conexion)/.test(t)) {
+    if (!sfPuedeEjecutar_(chatId, env)) { await enviar(chatId, '🔒 Correr opciones del Sheet está apagado para este chat.'); return; }
+    const r = await sfLlamar_(env, { accion: 'bot_diagnostico' });
+    if (!r.ok) { await enviar(chatId, r.error === 'ocupado' ? '⏳ Hay una corrida en curso. <code>estado corrida</code>' : sfErrorTexto_(r)); return; }
+    await enviar(chatId, '▶️ Prueba enviada al Sheet. Espero…'); await sfEsperarResultado_(chatId, env, r.job); return;
+  }
+  // Correr / confirmar: "ejecuta 12", "confirmar 85", "ejecuta 40 con 2026-10"
+  m = /^(ejecuta|ejecutar|corre|correr|confirmar|confirmo)\b\s*(.*)$/.exec(t);
+  if (m) {
+    const confirmado = m[1] === 'confirmar' || m[1] === 'confirmo';
+    // El dato (después de "con") se toma del texto ORIGINAL, sin quitarle mayúsculas ni signos.
+    const mo = /^\S+\s+(.*?)(?:\s+con\s+(.+))?$/i.exec(original);
+    const refTxt = mo ? mo[1] : m[2];
+    const entrada = mo && mo[2] ? mo[2].split(';').map(function (x) { return x.trim(); }).filter(Boolean).slice(0, 5) : [];
+    if (!sfLimpia_(refTxt)) { await enviar(chatId, 'ℹ️ Dime cuál: <code>ejecuta 12</code> o <code>ejecuta salud del sheet</code>. La lista: <code>funciones</code>.'); return; }
+    const r = sfBuscar_(refTxt);
+    if (!r.length) { await enviar(chatId, '🔎 No encontré esa opción en el menú. Prueba <code>funciones buscar ' + esc(refTxt.slice(0, 40)) + '</code>.'); return; }
+    if (r.length > 1) { await enviar(chatId, '🔎 Hay ' + r.length + ' opciones parecidas; dime el número:\n' + sfLineas_(r.slice(0, 10)) + (r.length > 10 ? '\n…y ' + (r.length - 10) + ' más.' : '')); return; }
+    await sfCorrer_(chatId, r[0], confirmado, entrada, env); return;
+  }
+  // Verificar contra el Sheet en vivo
+  if (/^funciones?\s+(verificar|sincronizar|comparar)/.test(t)) { await sfVerificar_(chatId, env); return; }
+  // Lista
+  const arg = t.replace(/^(funciones?|acciones?|menu|menu del|del)\s*/, '').replace(/^(del\s+)?(sheet|site|sheet site|site sheet)\b\s*/, '').replace(/^(buscar|busca)\s+/, '').trim();
+  if (!arg || arg === 'todas' || arg === 'lista') { await sfResumen_(chatId, env); return; }
+  const filas = sfFilas_();
+  let sel = [];
+  if (arg === 'atajo' || arg === 'atajo diario' || arg === 'diario') sel = filas.filter(function (f) { return f.fam === '⚡ Atajo diario'; });
+  else {
+    const fam = sfFamilias_().filter(function (fm) { return sfLimpia_(fm).indexOf(arg) >= 0; });
+    if (fam.length === 1) sel = filas.filter(function (f) { return f.fam === fam[0]; });
+    else sel = sfBuscar_(arg);
+  }
+  if (!sel.length) { await enviar(chatId, '🔎 No hay opciones del menú con “' + esc(arg.slice(0, 40)) + '”. <code>funciones</code> muestra las familias.'); return; }
+  const titulo = sel.every(function (f) { return f.fam === sel[0].fam; }) ? esc(sel[0].fam) : 'Resultado';
+  await enviar(chatId, '📋 <b>' + titulo + '</b> · ' + sel.length + ' opciones\n<i>✅ directo · ⚠️ pide confirmar · 🖥 solo en el Sheet</i>\n' + sfLineas_(sel) +
+    '\n<code>ejecuta &lt;número&gt;</code> para correr una.');
 }
 
 

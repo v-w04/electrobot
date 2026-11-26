@@ -1563,7 +1563,7 @@ body.girly-mode .mobile-menu-btn {
 
   /* Ayuda accesible: en vez de ocultarla, la dejamos como ícono compacto */
   .topbar-actions { display: flex; }
-  .topbar-actions .topbar-btn { padding: 8px 10px; font-size: 0; gap: 0; }
+  .topbar-actions .topbar-btn { padding: 8px 10px; font-size: 0; gap: 0; min-width: 40px; min-height: 40px; justify-content: center; }
   .topbar-actions .topbar-btn i { font-size: calc(15px * var(--fs)); }
 }
 
@@ -1748,6 +1748,10 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible, select:focus-vi
         </div>
       </div>
       <div class="topbar-actions">
+        <button class="topbar-btn" onclick="abrirCategoria('funciones')" title="Funciones del menú Site Sheet" aria-label="Funciones del menú Site Sheet">
+          <i class="fas fa-bolt"></i>
+          Funciones
+        </button>
         <button class="topbar-btn" onclick="sendMessage('ayuda')" title="Ver comandos">
           <i class="fas fa-circle-info"></i>
           Ayuda
@@ -1804,6 +1808,11 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible, select:focus-vi
                 <div class="tablero-icon">📚</div>
                 <div class="tablero-titulo">Hojas</div>
                 <div class="tablero-sub">Todas las pestañas de Site Sheet</div>
+              </button>
+              <button class="tablero" onclick="abrirCategoria('funciones')">
+                <div class="tablero-icon">⚡</div>
+                <div class="tablero-titulo">Funciones del Sheet</div>
+                <div class="tablero-sub">Las 142 opciones del menú</div>
               </button>
             </div>
 
@@ -2459,6 +2468,27 @@ const CATEGORIAS = {
       { icon: 'fas fa-chart-column',  label: 'Ventas 30 días',action: () => { cerrarCategoria(); sendMessage('ventas 30 dias'); } }
     ]
   },
+  funciones: {
+    icon: '⚡', nombre: 'Funciones del Sheet',
+    subs: [
+      { icon: 'fas fa-list', label: 'Todas', action: () => { cerrarCategoria(); sendMessage('funciones'); } },
+      { icon: 'fas fa-bolt', label: 'Atajo diario', action: () => { cerrarCategoria(); sendMessage('funciones atajo'); } },
+      { icon: 'fas fa-bullseye', label: 'Killers', action: () => { cerrarCategoria(); sendMessage('funciones killers'); } },
+      { icon: 'fas fa-tag', label: 'Precios', action: () => { cerrarCategoria(); sendMessage('funciones precios'); } },
+      { icon: 'fas fa-chart-line', label: 'Ventas', action: () => { cerrarCategoria(); sendMessage('funciones ventas'); } },
+      { icon: 'fas fa-ban', label: 'Pedidos y casos', action: () => { cerrarCategoria(); sendMessage('funciones pedidos'); } },
+      { icon: 'fas fa-store', label: 'Catálogo', action: () => { cerrarCategoria(); sendMessage('funciones catalogo'); } },
+      { icon: 'fas fa-truck-fast', label: 'Logística', action: () => { cerrarCategoria(); sendMessage('funciones logistica'); } },
+      { icon: 'fas fa-file-invoice', label: 'Cotizaciones', action: () => { cerrarCategoria(); sendMessage('funciones cotizaciones'); } },
+      { icon: 'fas fa-heart-pulse', label: 'Salud', action: () => { cerrarCategoria(); sendMessage('funciones salud'); } },
+      { icon: 'fas fa-gear', label: 'Configuración', action: () => { cerrarCategoria(); sendMessage('funciones configuracion'); } },
+      { icon: 'fas fa-play',           label: 'Ejecutar…',   action: () => { cerrarCategoria(); setInput('ejecuta '); } },
+      { icon: 'fas fa-clipboard-check', label: 'Resultado',   action: () => { cerrarCategoria(); sendMessage('estado corrida'); } },
+      { icon: 'fas fa-check-double',   label: 'Verificar',   action: () => { cerrarCategoria(); sendMessage('funciones verificar'); } },
+      { icon: 'fas fa-vial',           label: 'Probar',      action: () => { cerrarCategoria(); sendMessage('probar funciones'); } },
+      { icon: 'fas fa-circle-question', label: 'Cómo se usa', action: () => { cerrarCategoria(); mostrarGuia('funciones_sheet'); } }
+    ]
+  },
   hojas: {
     icon: '📚', nombre: 'Hojas',
     subs: [
@@ -2811,6 +2841,8 @@ const POOL_ATAJOS = [
   { type: 'guide', id: 'ver_hoja',        icon: 'fa-question',        title: '¿Cómo veo cualquier hoja?', sub: 'Control total' },
   { type: 'guide', id: 'buscar_stock',   icon: 'fa-question',          title: '¿Cómo busco un producto?',  sub: 'Stock por SKU o nombre' },
   { type: 'guide', id: 'consultar_precio', icon: 'fa-question',        title: '¿Cómo consulto un precio?', sub: 'Mínimo, normal, máximo' },
+  { type: 'guide', id: 'funciones_sheet', icon: 'fa-question',          title: '¿Cómo corro una función del Sheet?', sub: 'Las 142 del menú' },
+  { q: 'funciones',                   icon: 'fa-bolt',                 title: 'Funciones del Sheet',   sub: 'Menú SITE SHEET, desde aquí' },
 
   // ── AYUDA GENERAL ─────────────────────────────────────────────
   { q: 'ayuda',                       icon: 'fa-circle-info',          title: 'Ver todos los comandos', sub: 'Lista completa de funciones' }
@@ -2852,6 +2884,18 @@ const GUIAS = {
       { cmd: 'cuál es el total de valor parado en oportunidades?', label: '• Sumas' },
       { cmd: 'qué cancelaciones vienen de sobreventa CVA?', label: '• Filtrar y listar' },
       { cmd: 'compara killers bajo mínimo con estado killers', label: '• Cruzar pestañas' }
+    ]
+  },
+  funciones_sheet: {
+    titulo: '⚡ Cómo correr las funciones del Sheet',
+    intro: 'Las 142 opciones del menú SITE SHEET están aquí, con el mismo nombre y orden. <code>funciones</code> las lista por familia. ✅ corren directo, ⚠️ piden <code>confirmar</code> antes, 🖥 se quedan en el Sheet (credenciales, envíos con ventana de PRUEBA, pasos que usan tu selección). Cada corrida queda en la hoja Log (etapa BOT). Para correr hace falta el PIN de la app.',
+    ejemplos: [
+      { cmd: 'funciones',            label: '• Familias y conteos' },
+      { cmd: 'funciones killers',    label: '• Todas las de Killers' },
+      { cmd: 'funciones buscar sobreventa', label: '• Buscar por nombre' },
+      { cmd: 'ejecuta salud del sheet', label: '• Correr una (por nombre o número)' },
+      { cmd: 'estado corrida',       label: '• Ver el resultado de la última' },
+      { cmd: 'funciones verificar',  label: '• Comparar esta lista con el Sheet en vivo' }
     ]
   },
   ver_hoja: {
