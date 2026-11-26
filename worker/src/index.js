@@ -1831,7 +1831,7 @@ function sfVista_(j) {
   if (salida.length) t += '\n\n' + salida.map(function (l) { return '▸ ' + esc(l.slice(0, 300)); }).join('\n');
   if (j.retorno && String(j.salida || '').indexOf(String(j.retorno).slice(0, 60)) < 0) t += '\n\n' + esc(String(j.retorno).slice(0, 500));
   (j.necesita || []).slice(0, 3).forEach(function (n) {
-    if (/^dato:/.test(n)) t += '\n\n⚠️ Pide un dato: <i>' + esc(n.slice(6)) + '</i>\nMándalo así: <code>ejecuta ' + esc(j.fn) + ' con &lt;dato&gt;</code>';
+    if (/^dato:/.test(n)) t += '\n\n⚠️ Pide un dato: <i>' + esc(n.slice(6)) + '</i>\nMándalo así: <code>ejecuta ' + esc(j.fn) + ' con (aquí tu dato)</code>';
     else if (/^dato sensible:/.test(n)) t += '\n\n🔒 ' + esc(n);
     else if (/^pregunta:/.test(n)) t += '\n\n⚠️ Quiso preguntar y no se contestó solo: <i>' + esc(n.slice(10)) + '</i>\nSi quieres que la conteste el bot, usa <code>confirmar ' + esc(j.fn) + '</code>; si no, hazla en el Sheet.';
     else t += '\n\n🖥 ' + esc(n);
@@ -1951,7 +1951,7 @@ async function cmdFuncionesSheet_(chatId, texto, env) {
   if (!sel.length) { await enviar(chatId, '🔎 No hay opciones del menú con “' + esc(arg.slice(0, 40)) + '”. <code>funciones</code> muestra las familias.'); return; }
   const titulo = sel.every(function (f) { return f.fam === sel[0].fam; }) ? esc(sel[0].fam) : 'Resultado';
   await enviar(chatId, '📋 <b>' + titulo + '</b> · ' + sel.length + ' opciones\n<i>✅ directo · ⚠️ pide confirmar · 🖥 solo en el Sheet</i>\n' + sfLineas_(sel) +
-    '\n<code>ejecuta &lt;número&gt;</code> para correr una.');
+    '\nPara correr una, escribe <code>ejecuta</code> y el número de la izquierda. Ejemplo: <code>ejecuta ' + sel[0].n + '</code>');
 }
 
 
