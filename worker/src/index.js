@@ -14,7 +14,7 @@
 // Sello de version. El GET de la raiz lo devuelve y 5-SUBIR-TODO.bat lo
 // compara contra WORKER_VERSION de _config.bat: asi el verde solo sale si
 // Cloudflare de verdad esta sirviendo este codigo y no el anterior.
-const BOT_VERSION    = 'v8.10';
+const BOT_VERSION    = 'v8.11';
 
 let TELEGRAM_API     = '';     // se arma en cargarEnv() con env.TELEGRAM_TOKEN
 let GOOGLE_SA        = null;   // env.GOOGLE_SA_JSON parseado (cuenta de servicio)
@@ -1722,6 +1722,15 @@ function sfFamilias_() {
   sfFilas_().forEach(function (f) { if (out.indexOf(f.fam) < 0) out.push(f.fam); });
   return out;
 }
+// Fecha y hora en hora de Ciudad de Mexico, para que cada mensaje diga cuando se mando y cuando se contesto.
+function sfHora_(ms) {
+  const d = ms ? new Date(Number(ms)) : new Date();
+  try {
+    return new Intl.DateTimeFormat('es-MX', { timeZone: 'America/Mexico_City', weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(d).replace(/\./g, '');
+  } catch (e) { return d.toISOString(); }
+}
+function sfSello_(que, ms) { return '🕒 ' + que + ': ' + sfHora_(ms); }
 function sfIcono_(modo) { return modo === 'ok' ? '✅' : (modo === 'confirmar' ? '⚠️' : '🖥'); }
 function sfRuta_(f) { return 'SITE SHEET › ' + (f.sec ? f.sec + ' › ' : '') + f.etiqueta; }
 
@@ -1838,6 +1847,7 @@ function sfVista_(j) {
   });
   if (j.error) t += '\n\n❌ ' + esc(j.error);
   if (j.estado === 'ok' || j.estado === 'necesita' || j.estado === 'error') t += '\n\n<i>Todo quedó también en la hoja Log (etapa BOT).</i>';
+  t += '\n\n' + (j.creado ? sfSello_('Pedida', j.creado) + '\n' : '') + (j.inicio ? sfSello_('Inició', j.inicio) + '\n' : '') + (j.fin ? sfSello_('Terminó', j.fin) + '\n' : '') + sfSello_('Respuesta del bot');
   return t;
 }
 
@@ -1878,7 +1888,7 @@ async function sfCorrer_(chatId, f, confirmado, entrada, env) {
     if (r.error === 'ocupado') { await enviar(chatId, '⏳ Ya hay una corrida en curso (' + esc(r.etiqueta || '') + '). Espera a que termine: <code>estado corrida ' + esc(r.job || '') + '</code>'); return; }
     await enviar(chatId, sfErrorTexto_(r)); return;
   }
-  await enviar(chatId, '▶️ <b>' + esc(f.etiqueta) + '</b> enviada al Sheet (corrida <code>' + esc(r.job) + '</code>). Espero el resultado…');
+  await enviar(chatId, '▶️ <b>' + esc(f.etiqueta) + '</b> enviada al Sheet (corrida <code>' + esc(r.job) + '</code>).\n' + sfSello_('Enviada') + '\nEspero el resultado…');
   await sfEsperarResultado_(chatId, env, r.job);
 }
 
@@ -1919,7 +1929,7 @@ async function cmdFuncionesSheet_(chatId, texto, env) {
     if (!sfPuedeEjecutar_(chatId, env)) { await enviar(chatId, '🔒 Correr opciones del Sheet está apagado para este chat.'); return; }
     const r = await sfLlamar_(env, { accion: 'bot_diagnostico' });
     if (!r.ok) { await enviar(chatId, r.error === 'ocupado' ? '⏳ Hay una corrida en curso. <code>estado corrida</code>' : sfErrorTexto_(r)); return; }
-    await enviar(chatId, '▶️ Prueba enviada al Sheet. Espero…'); await sfEsperarResultado_(chatId, env, r.job); return;
+    await enviar(chatId, '▶️ Prueba enviada al Sheet.\n' + sfSello_('Enviada') + '\nEspero…'); await sfEsperarResultado_(chatId, env, r.job); return;
   }
   // Correr / confirmar: "ejecuta 12", "confirmar 85", "ejecuta 40 con 2026-10"
   m = /^(ejecuta|ejecutar|corre|correr|confirmar|confirmo)\b\s*(.*)$/.exec(t);
