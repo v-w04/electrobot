@@ -198,6 +198,9 @@ const SEGS = Math.max(0, Number(process.argv[4]) || 0);
 // Con alto fijo el logo se dibuja en su lugar, sin borrar nada.
 const ALTO = Math.max(0, Number(process.argv[5]) || 0);
 const ENLINEA = ALTO > 0;
+// Sin teclado ni pantalla (tarea automatica oculta, salida a archivo): no hay nadie que mire ni que presione una tecla.
+// Antes giraba para siempre y dejaba la subida colgada horas (y un log de cientos de MB). Ahora se va de inmediato.
+if (!process.stdin.isTTY && !process.stdout.isTTY) process.exit(0);
 const AVISO = '  Presione una tecla para continuar . . .';
 const FPS_MS = 60;
 const RAMP = ' .:-=+*#%@';
