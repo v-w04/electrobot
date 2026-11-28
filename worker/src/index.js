@@ -14,7 +14,7 @@
 // Sello de version. El GET de la raiz lo devuelve y 5-SUBIR-TODO.bat lo
 // compara contra WORKER_VERSION de _config.bat: asi el verde solo sale si
 // Cloudflare de verdad esta sirviendo este codigo y no el anterior.
-const BOT_VERSION    = 'v8.11';
+const BOT_VERSION    = 'v8.12';
 
 let TELEGRAM_API     = '';     // se arma en cargarEnv() con env.TELEGRAM_TOKEN
 let GOOGLE_SA        = null;   // env.GOOGLE_SA_JSON parseado (cuenta de servicio)
@@ -1519,7 +1519,7 @@ async function ayuda(chatId, nombre) {
     '🧩 <code>parrilla audio</code> (también computacion, tv, fotografia…) · 💡 <code>oportunidades</code> · 🔗 <code>edi</code> · 🧬 <code>variantes</code>\n'+
     '🔁 <code>cambio walmart</code> · 🎁 <code>promociones</code> · 💰 <code>comisiones</code> · 🏷️ <code>catalogo cva</code> · 🔒 <code>bloqueados</code>\n'+
     '<i>Todos aceptan palabras para filtrar:</i> <code>cancelaciones sobreventa</code> · <code>casos por abrir</code>\n\n'+
-    '<b>⚙️ FUNCIONES DEL MENÚ SITE SHEET</b> <i>(las 142 opciones del menú del Sheet, desde aquí)</i>\n'+
+    '<b>⚙️ FUNCIONES DEL MENÚ SITE SHEET</b> <i>(las 143 opciones del menú del Sheet, desde aquí)</i>\n'+
     '<code>funciones</code> — lista por familia (🔥 killers, 💲 precios, 📈 ventas, 🚚 logística…) · <code>funciones killers</code> · <code>funciones buscar salud</code>\n'+
     '<code>ejecuta 12</code> · <code>ejecuta salud del sheet</code> — corre una opción · <code>confirmar 85</code> — las ⚠️ lo piden antes\n'+
     '<code>ejecuta 40 con 2026-10</code> — si una opción pide un dato · <code>estado corrida</code> — resultado de la última\n'+
@@ -1549,7 +1549,7 @@ async function ayuda(chatId, nombre) {
 // ============================================================
 // FUNCIONES DEL MENÚ SITE SHEET (v8.10)
 // ============================================================
-// SITE_MENU_ es una copia EXACTA del menú SITE SHEET del Sheet (onOpen de Setup.gs): 142 opciones, mismo orden,
+// SITE_MENU_ es una copia EXACTA del menú SITE SHEET del Sheet (onOpen de Setup.gs): 143 opciones, mismo orden,
 // mismas etiquetas y funciones. Se generó leyendo ese código, no se inventó nada. Para comprobar que sigue igual
 // que el Sheet en vivo: "funciones verificar" (compara contra la lista que devuelve Apps Script).
 // Fila: [sección, etiqueta, función, modo (o=directo, c=confirmar, s=solo en el Sheet), motivo (s,e,v,r)].
@@ -1598,6 +1598,7 @@ const SITE_MENU_ = [
   ["🚫 Pedidos y casos › 📦 Sobreventa","❌ Cancelar en Odoo las marcadas de sobreventa","cancelacionesSobreventaMarcadas","c",""],
   ["🚫 Pedidos y casos › ❌ Cancelaciones","📥 Leer cancelaciones del correo","cancelacionesBajar","o",""],
   ["🚫 Pedidos y casos › ❌ Cancelaciones","📋 Pendientes de cancelar en el site","cancelacionesPendientesSite","o",""],
+  ["🚫 Pedidos y casos › ❌ Cancelaciones","📦 Marcar paquetería avisada","cancelacionesMarcarAvisadas","s","y"],
   ["🚫 Pedidos y casos › ❌ Cancelaciones","🧾 Verificar cancelaciones en Odoo","cancelacionesVerificarOdoo","o",""],
   ["🚫 Pedidos y casos › ❌ Cancelaciones › ⚙️ Configurar","🔑 Guardar PIN y quién cancela","cancelacionesGuardarPin","s","s"],
   ["🚫 Pedidos y casos › ❌ Cancelaciones › ⚙️ Configurar","⏱️ Activar cancelaciones automáticas","cancelacionesActivarTrigger","c",""],
@@ -1701,7 +1702,8 @@ const SITE_MOTIVOS_ = {
   s: 'Pide o borra credenciales: se captura en el Sheet, nunca por el bot.',
   e: 'Es un envío real (correo, Odoo o Walmart): se confirma en la ventana del Sheet, con PRUEBA primero y cuenta regresiva.',
   v: 'Necesita tu selección o una ventana con opciones dentro de la hoja.',
-  r: 'Lee Venta Diaria Odoo, que ya se retiró: no se corre desde el bot.'
+  r: 'Lee Venta Diaria Odoo, que ya se retiró: no se corre desde el bot.',
+  y: 'Pide confirmación en una ventana del Sheet: se corre desde el menú del Sheet.'
 };
 let _sfFilas = null;
 function sfLimpia_(s) {
@@ -1909,7 +1911,7 @@ async function sfVerificar_(chatId, env) {
   let t = '⚠️ La lista del bot y la del Sheet ya no coinciden.\n';
   if (faltanAqui.length) t += '\n<b>Nuevas en el Sheet</b> (' + faltanAqui.length + '):\n' + faltanAqui.slice(0, 8).map(function (x) { return '• ' + esc(x.etiqueta); }).join('\n');
   if (sobranAqui.length) t += '\n\n<b>Ya no están en el Sheet</b> (' + sobranAqui.length + '):\n' + sobranAqui.slice(0, 8).map(function (x) { return '• ' + esc(x.etiqueta); }).join('\n');
-  t += '\n\nPídeme actualizar la lista del bot desde el menú del Sheet.';
+  t += '\n\nEl bot no usa IA: es un programa fijo y no se actualiza solo. Pídele a Claude, en el chat donde se arma Electrobot, que ponga la lista al día.';
   await enviar(chatId, t);
 }
 

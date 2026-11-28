@@ -902,6 +902,9 @@ body.composer-on-top .chat-main { padding-bottom: 16px; }
   border-top-right-radius: 4px;
 }
 
+.msg-time { display:block; text-align:right; margin-top:4px; font-size: calc(10.5px * var(--fs)); line-height:1; opacity:.6; white-space:nowrap; user-select:none; }
+.message.user .msg-time { opacity:.75; }
+.dia-sep { align-self:center; margin:10px 0 4px; padding:3px 12px; border-radius:999px; font-size: calc(11px * var(--fs)); color: var(--text-secondary); background: rgba(30,41,59,.7); border:1px solid var(--border-color); }
 .msg-bubble b, .msg-bubble strong { font-weight: 700; color: var(--text-primary); }
 .message.user .msg-bubble b { color: white; }
 .msg-bubble i, .msg-bubble em { font-style: italic; color: var(--text-secondary); }
@@ -1812,7 +1815,7 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible, select:focus-vi
               <button class="tablero" onclick="abrirCategoria('funciones')">
                 <div class="tablero-icon">⚡</div>
                 <div class="tablero-titulo">Funciones del Sheet</div>
-                <div class="tablero-sub">Las 142 opciones del menú</div>
+                <div class="tablero-sub">Las 143 opciones del menú</div>
               </button>
             </div>
 
@@ -2633,29 +2636,55 @@ function hideWelcome() {
   detenerAutoRefresh();
 }
 
+var _ultimoDia = '';
+function selloHora_(d) { try { return d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false }); } catch (e) { return ''; } }
+function etiquetaDia_(d) {
+  try {
+    var hoy = new Date(), ayer = new Date(); ayer.setDate(hoy.getDate() - 1);
+    var k = function (x) { return x.getFullYear() + '-' + x.getMonth() + '-' + x.getDate(); };
+    if (k(d) === k(hoy)) return 'Hoy';
+    if (k(d) === k(ayer)) return 'Ayer';
+    return d.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+  } catch (e) { return ''; }
+}
+function separadorDia_(d) {
+  var k = d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate();
+  if (k === _ultimoDia) return;
+  _ultimoDia = k;
+  var s = document.createElement('div'); s.className = 'dia-sep'; s.textContent = etiquetaDia_(d);
+  chatContainer.appendChild(s);
+}
+function selloHtml_(d) {
+  var ful = ''; try { ful = d.toLocaleString('es-MX', { dateStyle: 'full', timeStyle: 'medium' }); } catch (e) {}
+  return '<span class="msg-time" title="' + ful + '">' + selloHora_(d) + '</span>';
+}
+
 function addUserMessage(text) {
   hideWelcome();
+  const ahora = new Date(); separadorDia_(ahora);
   const msg = document.createElement('div');
   msg.className = 'message user';
   msg.innerHTML =
     '<div class="msg-avatar"><i class="fas fa-user"></i></div>' +
-    '<div class="msg-bubble">' + escapeHtml(text) + '</div>';
+    '<div class="msg-bubble">' + escapeHtml(text) + selloHtml_(ahora) + '</div>';
   chatContainer.appendChild(msg);
   scrollToBottom();
 }
 
 function addBotMessage(html) {
+  const ahora = new Date(); separadorDia_(ahora);
   const msg = document.createElement('div');
   msg.className = 'message bot';
   msg.innerHTML =
     '<div class="msg-avatar"><i class="fas fa-robot"></i></div>' +
     '<div class="msg-bubble">' + sanitizeBotHtml(html) +
-    '<button type="button" class="msg-copy" aria-label="Copiar respuesta" title="Copiar"><i class="fas fa-copy"></i></button></div>';
+    selloHtml_(ahora) + '<button type="button" class="msg-copy" aria-label="Copiar respuesta" title="Copiar"><i class="fas fa-copy"></i></button></div>';
   const bCopiar = msg.querySelector('.msg-copy');
   bCopiar.addEventListener('click', function () {
     const burbuja = msg.querySelector('.msg-bubble');
     const clon = burbuja.cloneNode(true);
     const x = clon.querySelector('.msg-copy'); if (x) x.remove();
+    const hh = clon.querySelector('.msg-time'); if (hh) hh.remove();
     const txt = (clon.innerText || clon.textContent || '').trim();
     const listo = function () { bCopiar.classList.add('ok'); bCopiar.innerHTML = '<i class="fas fa-check"></i>'; setTimeout(function () { bCopiar.classList.remove('ok'); bCopiar.innerHTML = '<i class="fas fa-copy"></i>'; }, 1400); };
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(listo).catch(function () {});
@@ -2888,7 +2917,7 @@ const GUIAS = {
   },
   funciones_sheet: {
     titulo: '⚡ Cómo correr las funciones del Sheet',
-    intro: 'Las 142 opciones del menú SITE SHEET están aquí, con el mismo nombre y orden. <code>funciones</code> las lista por familia. ✅ corren directo, ⚠️ piden <code>confirmar</code> antes, 🖥 se quedan en el Sheet (credenciales, envíos con ventana de PRUEBA, pasos que usan tu selección). Cada corrida queda en la hoja Log (etapa BOT). Para correr hace falta el PIN de la app.',
+    intro: 'Las 143 opciones del menú SITE SHEET están aquí, con el mismo nombre y orden. <code>funciones</code> las lista por familia. ✅ corren directo, ⚠️ piden <code>confirmar</code> antes, 🖥 se quedan en el Sheet (credenciales, envíos con ventana de PRUEBA, pasos que usan tu selección). Cada corrida queda en la hoja Log (etapa BOT). Para correr hace falta el PIN de la app.',
     ejemplos: [
       { cmd: 'funciones',            label: '• Familias y conteos' },
       { cmd: 'funciones killers',    label: '• Todas las de Killers' },
